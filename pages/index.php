@@ -1,4 +1,4 @@
 <?php
 $package = rex_addon::get('trash');
-echo rex_view::title('trash');
+echo rex_view::title(rex_i18n::msg('trash_trash'));
 rex_be_controller::includeCurrentPageSubPath();
