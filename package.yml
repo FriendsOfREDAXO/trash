@@ -15,4 +15,4 @@ page:
     perm: admin
     icon: fa fa-trash
     subpages:
-        main: { title: translate:trash_main }
+        trash: { title: translate:trash_main }
