@@ -13,6 +13,6 @@ requires:
 page:
     title: translate:trash
     perm: admin
-    icon: fa fa-trash
+    icon: rex-icon fa fa-trash
     subpages:
         trash: { title: translate:trash_main }
