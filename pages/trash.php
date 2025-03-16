@@ -186,18 +186,18 @@ if ($func === 'restore' && $articleId > 0) {
                 }
                 
                 // Erfolgsmeldung anzeigen
-                $message = rex_view::success('Artikel wurde wiederhergestellt.');
+                $message = rex_view::success(rex_i18n::msg('article_restored'));
                 if (!$parentExists) {
-                    $message .= rex_view::warning('Die ursprüngliche Elternkategorie existiert nicht mehr. Der Artikel wurde in der Root-Ebene wiederhergestellt.');
+                    $message .= rex_view::warning(rex_i18n::msg('parent_category_missing'));
                 }
             } else {
-                $message = rex_view::error('Fehler beim Wiederherstellen des Artikels.');
+                $message = rex_view::error(rex_i18n::msg('restore_error'));
             }
         } catch (Exception $e) {
-            $message = rex_view::error('Fehler beim Wiederherstellen des Artikels: ' . $e->getMessage());
+            $message = rex_view::error(rex_i18n::msg('restore_error') . ': ' . $e->getMessage());
         }
     } else {
-        $message = rex_view::error('Der zu wiederherstellende Artikel wurde nicht gefunden.');
+        $message = rex_view::error(rex_i18n::msg('article_not_found'));
     }
 } elseif ($func === 'delete' && $articleId > 0) {
     // Artikel endgültig löschen
@@ -209,13 +209,13 @@ if ($func === 'restore' && $articleId > 0) {
     // Dann den Artikel selbst
     $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE id = :id', ['id' => $articleId]);
     
-    $message = rex_view::success('Artikel wurde endgültig gelöscht');
+    $message = rex_view::success(rex_i18n::msg('article_deleted'));
 } elseif ($func === 'empty') {
     // Papierkorb leeren
     $sql = rex_sql::factory();
     $sql->setQuery('DELETE FROM ' . $trashSliceTable);
     $sql->setQuery('DELETE FROM ' . $trashTable);
-    $message = rex_view::success('Papierkorb wurde geleert');
+    $message = rex_view::success(rex_i18n::msg('trash_emptied'));
 }
 
 // Ausgabe der Liste der Artikel im Papierkorb
@@ -237,14 +237,14 @@ $list->addTableAttribute('class', 'table-striped');
 // Spalten definieren
 $list->removeColumn('id');
 $list->removeColumn('attributes');
-$list->setColumnLabel('article_id', 'Originale ID');
-$list->setColumnLabel('name', 'Name');
-$list->setColumnLabel('catname', 'Kategorie');
-$list->setColumnLabel('parent_id', 'Eltern-ID');
-$list->setColumnLabel('languages', 'Sprachen');
-$list->setColumnLabel('deleted_at', 'Gelöscht am');
-$list->setColumnLabel('startarticle', 'Startartikel');
-$list->setColumnLabel('slice_count', 'Anzahl Slices');
+$list->setColumnLabel('article_id', rex_i18n::msg('original_id'));
+$list->setColumnLabel('name', rex_i18n::msg('article_name'));
+$list->setColumnLabel('catname', rex_i18n::msg('category_name'));
+$list->setColumnLabel('parent_id', rex_i18n::msg('parent_id'));
+$list->setColumnLabel('languages', rex_i18n::msg('languages'));
+$list->setColumnLabel('deleted_at', rex_i18n::msg('deleted_at'));
+$list->setColumnLabel('startarticle', rex_i18n::msg('is_startarticle'));
+$list->setColumnLabel('slice_count', rex_i18n::msg('slice_count'));
 
 // Formatierungen
 $list->setColumnFormat('deleted_at', 'date', 'd.m.Y H:i');
@@ -256,7 +256,7 @@ $list->setColumnFormat('status', 'custom', function($params) {
 });
 $list->setColumnFormat('languages', 'custom', function($params) {
     if (!$params['value']) {
-        return 'Keine';
+        return rex_i18n::msg('no_languages');
     }
     $langIds = explode(',', $params['value']);
     $names = [];
@@ -273,10 +273,10 @@ $list->setColumnParams('restore', ['func' => 'restore', 'id' => '###id###']);
 
 $list->addColumn('delete', '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('delete'));
 $list->setColumnParams('delete', ['func' => 'delete', 'id' => '###id###']);
-$list->addLinkAttribute('delete', 'data-confirm', rex_i18n::msg('delete') . ' ?');
+$list->addLinkAttribute('delete', 'data-confirm', rex_i18n::msg('confirm_delete'));
 
 // Keine Einträge Meldung
-$list->setNoRowsMessage('Der Papierkorb ist leer');
+$list->setNoRowsMessage(rex_i18n::msg('trash_empty'));
 
 // Ausgabe der Liste
 $content = $list->get();
@@ -286,8 +286,8 @@ $buttons = '
 <div class="row">
     <div class="col-sm-12">
         <div class="pull-right">
-            <a href="' . rex_url::currentBackendPage(['func' => 'empty']) . '" class="btn btn-danger" data-confirm="' . rex_i18n::msg('delete') . ' ?">
-                <i class="rex-icon rex-icon-delete"></i> Papierkorb leeren
+            <a href="' . rex_url::currentBackendPage(['func' => 'empty']) . '" class="btn btn-danger" data-confirm="' . rex_i18n::msg('confirm_empty_trash') . '">
+                <i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('empty_trash') . '
             </a>
         </div>
     </div>
@@ -295,7 +295,7 @@ $buttons = '
 
 // Ausgabe des Inhalts
 $fragment = new rex_fragment();
-$fragment->setVar('title', 'Artikel-Papierkorb');
+$fragment->setVar('title', rex_i18n::msg('trash'), false);
 $fragment->setVar('content', $content, false);
 $fragment->setVar('options', $buttons, false);
 echo $fragment->parse('core/page/section.php');
