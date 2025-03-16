@@ -1,8 +1,18 @@
-package: addon_key
-version: '0.0.0'
-author: 'Friends Of REDAXO'
-supportpage: https://github.com/FriendsOfREDAXO/addon_key
+package: trash
+version: '1.0.0'
+author: Thomas Skerbis
+supportpage: 
+
 requires:
-    redaxo: '^5.15.1'
+    redaxo: '^5.10'
     php:
-        version: '>=8.1, <9'
+        version: '>=8.1'
+    packages:
+        structure: '^2.0.0'
+
+page:
+    title: translate:trash
+    perm: admin
+    icon: fa fa-trash
+    subpages:
+        main: { title: translate:trash_main }
