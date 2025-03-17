@@ -99,6 +99,11 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
                                 $sliceSql->setValue('priority', $slice->getValue('priority') ?: 0);
                                 $sliceSql->setValue('revision', $revision);
                                 
+                                // Status kopieren, falls vorhanden
+                                if ($slice->hasValue('status')) {
+                                    $sliceSql->setValue('status', $slice->getValue('status'));
+                                }
+                                
                                 // Alle Feldtypen mit Schleifen verarbeiten
                                 $fieldTypes = [
                                     'value' => 20,
