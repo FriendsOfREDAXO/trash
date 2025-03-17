@@ -152,3 +152,7 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
         }
     }
 });
+// Cronjob registrieren, wenn das Cronjob AddOn installiert und aktiviert ist
+if (rex_addon::get('cronjob')->isAvailable()) {
+    rex_cronjob_manager::registerType('rex_cronjob_trash_cleanup');
+}
