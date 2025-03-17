@@ -12,6 +12,7 @@ confirm_empty_trash = Wirklich den gesamten Papierkorb leeren?
 parent_category_missing = Die ursprüngliche Elternkategorie existiert nicht mehr. Der Artikel wurde in der Root-Ebene wiederhergestellt.
 restore_error = Fehler beim Wiederherstellen des Artikels
 article_not_found = Der zu wiederherstellende Artikel wurde nicht gefunden
+article_restored_with_new_id = Der Artikel konnte nicht unter seiner ursprünglichen ID {0} wiederhergestellt werden und hat nun die ID {1}.
 original_id = Originale ID
 article_name = Name
 category_name = Kategorie 
