@@ -36,6 +36,7 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
         // Tabellennamen definieren
         $trashTable = rex::getTable('trash_article');
         $trashSliceTable = rex::getTable('trash_article_slice');
+        $trashSliceMetaTable = rex::getTable('trash_slice_meta');
         
         // SQL Objekt initialisieren
         $sql = rex_sql::factory();
@@ -58,7 +59,21 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
                 foreach ($articlesToDelete as $article) {
                     $id = $article['id'];
                     
-                    // Zuerst alle Slices des Artikels löschen
+                    // Zuerst alle Slice-IDs holen, um die Meta-Daten zu löschen
+                    $sliceIds = $sql->getArray(
+                        'SELECT id FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id',
+                        ['id' => $id]
+                    );
+                    
+                    // Für jede Slice-ID die Meta-Daten löschen
+                    foreach ($sliceIds as $slice) {
+                        $sql->setQuery(
+                            'DELETE FROM ' . $trashSliceMetaTable . ' WHERE trash_slice_id = :slice_id',
+                            ['slice_id' => $slice['id']]
+                        );
+                    }
+                    
+                    // Dann alle Slices des Artikels löschen
                     $sql->setQuery(
                         'DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id',
                         ['id' => $id]
