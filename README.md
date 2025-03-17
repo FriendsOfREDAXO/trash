@@ -18,6 +18,7 @@ Trash fängt deine gelöschten Artikel ab, bevor sie ins digitale Nirvana versch
 - **Volle Power** - Alle Inhaltsblöcke, Module und sogar die Arbeitsversion bleiben erhalten
 - **Original-IDs** - Artikel werden wenn möglich unter ihrer ursprünglichen ID wiederhergestellt
 - **Meta-Daten Erhaltung** - Alle Metafelder von AddOns wie MetaInfo oder YRewrite bleiben erhalten
+- **Selbstreinigend** - Der integrierte Cronjob räumt alte Artikel automatisch auf (wenn gewünscht)
 - **One-Click-Wonder** - Artikel mit einem Klick komplett wiederherstellen
 - **Versionierungs-freundlich** - Deine Arbeitsversionen bleiben erhalten (**ja, wirklich!**)
 - **Mehrsprachig** - Deine Übersetzungen sind genauso wichtig wie die Hauptsprache
@@ -28,7 +29,7 @@ Trash fängt deine gelöschten Artikel ab, bevor sie ins digitale Nirvana versch
 Einfach wie Kuchen essen:
 - **"Oh nein, falscher Artikel gelöscht!"** → Ab in den Papierkorb, wiederherstellen, fertig!
 - **"Der alte Kram kann jetzt wirklich weg"** → Endgültig löschen
-- **"Großreinemachen"** → Papierkorb komplett leeren
+- **"Großreinemachen"** → Papierkorb komplett leeren oder einfach den Cronjob für dich arbeiten lassen
 
 ## Insider-Tipps
 
@@ -36,6 +37,7 @@ Einfach wie Kuchen essen:
 - Wenn die Elternkategorie weg ist, landet der wiederhergestellte Artikel einfach in der Hauptebene
 - Falls die Original-ID bereits vergeben ist, bekommt der wiederhergestellte Artikel automatisch eine neue ID
 - Meta-Daten werden nur wiederhergestellt, wenn die entsprechenden AddOns noch installiert sind
+- Mit dem Cronjob kannst du festlegen, wie lange Artikel im Papierkorb bleiben sollen (1 Tag bis 1 Jahr)
 
 ## Technische Details
 
@@ -43,6 +45,7 @@ Einfach wie Kuchen essen:
 - Speichert Meta-Daten in JSON-Format für einfache Wiederherstellung
 - Unterstützt das Structure/Version Plugin (falls installiert)
 - Saubere Deinstallation mit vollständiger Entfernung aller Tabellen
+- Optionaler Cronjob zum automatischen Aufräumen alter Einträge
 
 ## Wer hat's gemacht?
 
