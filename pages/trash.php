@@ -152,6 +152,15 @@ if ($func === 'restore' && $articleId > 0) {
             // Meta-Attribute wiederherstellen
             if ($metaAttributes) {
                 try {
+                    // Spalteninformationen der Artikeltabelle abrufen
+                    $columnInfo = rex_sql::showColumns(rex::getTable('article'));
+                    $existingColumns = [];
+                    
+                    // Vorhandene Spalten in ein Array überführen für schnelleren Zugriff
+                    foreach ($columnInfo as $column) {
+                        $existingColumns[$column['name']] = true;
+                    }
+                    
                     $metaSql = rex_sql::factory();
                     $metaSql->setTable(rex::getTable('article'));
                     
@@ -162,7 +171,7 @@ if ($func === 'restore' && $articleId > 0) {
                         $hasValues = false;
                         foreach ($metaAttributes as $key => $value) {
                             // Prüfen ob die Spalte existiert (AddOn könnte deinstalliert worden sein)
-                            if (rex_sql::hasColumn(rex::getTable('article'), $key)) {
+                            if (isset($existingColumns[$key])) {
                                 $metaSql->setValue($key, $value);
                                 $hasValues = true;
                             }
