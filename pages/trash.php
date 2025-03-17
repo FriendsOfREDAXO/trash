@@ -252,7 +252,7 @@ if ($func === 'restore' && $articleId > 0) {
                                 'updateuser' => rex::getUser()->getLogin()
                             ];
                             
-                            // Status explizit behandeln, wenn vorhanden
+                            // Status kopieren, falls vorhanden
                             if (isset($slice['status'])) {
                                 $insertData['status'] = (int)$slice['status'];
                             }
