@@ -23,7 +23,7 @@ rex_sql_table::get(rex::getTable('trash_article_slice'))
     ->ensureColumn(new rex_sql_column('module_id', 'int(10) unsigned'))
     ->ensureColumn(new rex_sql_column('priority', 'int(10) unsigned'))
     ->ensureColumn(new rex_sql_column('revision', 'int(10) unsigned', false, '0'))
-    ->ensureColumn(new rex_sql_column('meta_attributes', 'longtext'))
+    ->ensureColumn(new rex_sql_column('status', 'tinyint(1)', false, '1'))
     ->ensureColumn(new rex_sql_column('value1', 'mediumtext', true))
     ->ensureColumn(new rex_sql_column('value2', 'mediumtext', true))
     ->ensureColumn(new rex_sql_column('value3', 'mediumtext', true))
@@ -85,4 +85,12 @@ rex_sql_table::get(rex::getTable('trash_article_slice'))
     ->ensureColumn(new rex_sql_column('linklist9', 'text', true))
     ->ensureColumn(new rex_sql_column('linklist10', 'text', true))
     ->ensureIndex(new rex_sql_index('trash_article_id', ['trash_article_id']))
+    ->ensure();
+
+// Spezielle Tabelle für Slice-Meta-Daten
+rex_sql_table::get(rex::getTable('trash_slice_meta'))
+    ->ensurePrimaryIdColumn()
+    ->ensureColumn(new rex_sql_column('trash_slice_id', 'int(10) unsigned'))
+    ->ensureColumn(new rex_sql_column('meta_data', 'longtext'))
+    ->ensureIndex(new rex_sql_index('trash_slice_id', ['trash_slice_id']))
     ->ensure();
