@@ -112,7 +112,7 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
      */
     public function getEnvironments()
     {
-        return [rex_cronjob::FRONTEND, rex_cronjob::BACKEND];
+        return ['frontend', 'backend'];
     }
     
     /**
