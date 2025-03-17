@@ -195,36 +195,45 @@ if ($func === 'restore' && $articleId > 0) {
             
             // Eine Liste aller Sprachen, in denen Slices existieren
             $clangIds = [];
-            $revisions = [0]; // Standardmäßig Live-Version (0)
+            $revisions = [];
             
-            // Prüfen, ob rex_plugin::get('structure', 'version')->isAvailable()
-            if (rex_plugin::get('structure', 'version')->isAvailable()) {
-                $revisions[] = 1; // Arbeitsversion (1) hinzufügen, wenn das Versions-Plugin verfügbar ist
-            }
-            
+            // Alle verfügbaren Revisions und Sprachen erfassen
             foreach ($slices as $slice) {
                 $clangIds[$slice['clang_id']] = true;
-                if (isset($slice['revision']) && $slice['revision'] > 0 && !in_array($slice['revision'], $revisions)) {
-                    $revisions[] = $slice['revision'];
-                }
+                $revisions[$slice['revision']] = true;
             }
             
+            // Sicherstellen, dass Live-Version (0) immer vorhanden ist
+            $revisions[0] = true;
+            
+            // Wenn das Versions-Plugin verfügbar ist, auch die Arbeitsversion (1) hinzufügen
+            if (rex_plugin::get('structure', 'version')->isAvailable()) {
+                $revisions[1] = true;
+            }
+            
+            // Slices nach Sprache und Revision wiederherstellen
             foreach (array_keys($clangIds) as $clangId) {
-                foreach ($revisions as $revision) {
-                    // Für jede Sprache und Revision die Slices wiederherstellen
+                foreach (array_keys($revisions) as $revision) {
+                    // Priorität für jede Kombination aus Sprache und Revision neu beginnen
                     $currentPriority = 1;
                     
+                    // Alle relevanten Slices für diese Sprache und Revision sammeln
+                    $revisionSlices = [];
                     foreach ($slices as $slice) {
-                        // Nur die Slices der aktuellen Sprache bearbeiten
-                        if ($slice['clang_id'] != $clangId) {
-                            continue;
+                        // Nur Slices für aktuelle Sprache und Revision berücksichtigen
+                        if ((int)$slice['clang_id'] === (int)$clangId && 
+                            (int)$slice['revision'] === (int)$revision) {
+                            $revisionSlices[] = $slice;
                         }
-                        
-                        // Wenn das Slice eine Revision hat und wir nach Revision filtern wollen
-                        if (isset($slice['revision']) && $slice['revision'] != $revision) {
-                            continue;
-                        }
-                        
+                    }
+                    
+                    // Slices nach Priorität sortieren
+                    usort($revisionSlices, function($a, $b) {
+                        return (int)$a['priority'] - (int)$b['priority'];
+                    });
+                    
+                    // Slices für aktuelle Sprache und Revision wiederherstellen
+                    foreach ($revisionSlices as $slice) {
                         try {
                             // Spalteninformationen der Slice-Tabelle abrufen (nur einmal)
                             static $sliceColumns = null;
@@ -244,7 +253,7 @@ if ($func === 'restore' && $articleId > 0) {
                                 'clang_id' => $slice['clang_id'],
                                 'ctype_id' => $slice['ctype_id'] ?: 1,
                                 'module_id' => $slice['module_id'] ?: 0,
-                                'revision' => $revision,
+                                'revision' => $revision,  // Explizit die aktuelle Revision verwenden
                                 'priority' => $currentPriority++,
                                 'createdate' => date('Y-m-d H:i:s'),
                                 'createuser' => rex::getUser()->getLogin(),
@@ -346,10 +355,13 @@ if ($func === 'restore' && $articleId > 0) {
             // Cache löschen und neu generieren
             rex_article_cache::delete($newArticleId);
             
-            // Wenn das Versions-Plugin vorhanden ist, Content generieren für beide Revisionen
+            // Content generieren für alle relevanten Revisionen und Sprachen
             if (rex_plugin::get('structure', 'version')->isAvailable()) {
                 foreach (array_keys($clangIds) as $clangId) {
-                    rex_content_service::generateArticleContent($newArticleId, $clangId);
+                    // Explizit den Content für die Live-Version generieren
+                    rex_content_service::generateArticleContent($newArticleId, $clangId, 0);
+                    // Und explizit den Content für die Arbeitsversion generieren
+                    rex_content_service::generateArticleContent($newArticleId, $clangId, 1);
                 }
             } else {
                 // Sonst nur für die Live-Version
