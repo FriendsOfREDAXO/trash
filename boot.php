@@ -30,6 +30,9 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
     $trashSliceTable = rex::getTable('trash_article_slice');
     $trashSliceMetaTable = rex::getTable('trash_slice_meta');
     
+    // Aktuelle Zeit in korrekt formatiertem Format
+    $currentTimestamp = date('Y-m-d H:i:s');
+    
     // Prüfen, ob der Artikel bereits im Papierkorb existiert (vermeidet Duplikate bei mehreren Sprachen)
     $sql = rex_sql::factory();
     $exists = $sql->getArray('SELECT id FROM ' . $trashTable . ' WHERE article_id = :article_id', ['article_id' => $articleId]);
@@ -57,7 +60,7 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
             $sql->setValue('catpriority', 0);
             $sql->setValue('status', $status ?: 0);
             $sql->setValue('startarticle', 0);
-            $sql->setValue('deleted_at', date('Y-m-d H:i:s'));
+            $sql->setValue('deleted_at', $currentTimestamp);
             $sql->setValue('attributes', '{}');
             
             // Speichern und fortfahren
@@ -95,19 +98,19 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
         $sql->setValue('catpriority', $article->getValue('catpriority'));
         $sql->setValue('status', $article->getValue('status'));
         $sql->setValue('startarticle', $article->isStartArticle() ? 1 : 0);
-        $sql->setValue('deleted_at', date('Y-m-d H:i:s'));
+        $sql->setValue('deleted_at', $currentTimestamp);
         
-        // Weitere wichtige Daten speichern
-        $attributes = json_encode([
+        // Beim Speichern der Attribute sicherstellen, dass das Datum korrekt formatiert ist
+        $attributes = [
             'path' => $article->getValue('path'),
             'priority' => $article->getValue('priority'),
             'template_id' => $article->getValue('template_id'),
-            'createdate' => $article->getValue('createdate'),
+            'createdate' => formatDateIfNeeded($article->getValue('createdate')),
             'createuser' => $article->getValue('createuser'),
-            'updatedate' => $article->getValue('updatedate'),
+            'updatedate' => formatDateIfNeeded($article->getValue('updatedate')),
             'updateuser' => $article->getValue('updateuser')
-        ]);
-        $sql->setValue('attributes', $attributes);
+        ];
+        $sql->setValue('attributes', json_encode($attributes));
         
         // Meta-Attribute als JSON speichern
         $metaAttributes = collectMetaAttributes('article', $article);
@@ -158,6 +161,31 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
 });
 
 /**
+ * Hilfsfunktion, um sicherzustellen, dass ein Datum im Format Y-m-d H:i:s vorliegt
+ * 
+ * @param string $date Das zu formatierende Datum
+ * @return string Korrekt formatiertes Datum
+ */
+function formatDateIfNeeded($date) {
+    if (!$date) {
+        return date('Y-m-d H:i:s');
+    }
+    
+    // Prüfen, ob das Datum bereits das richtige Format hat
+    if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $date)) {
+        return $date;
+    }
+    
+    // Versuchen, das Datum zu parsen und neu zu formatieren
+    $timestamp = strtotime($date);
+    if ($timestamp === false) {
+        return date('Y-m-d H:i:s');
+    }
+    
+    return date('Y-m-d H:i:s', $timestamp);
+}
+
+/**
  * Slice in den Papierkorb sichern
  * 
  * @param rex_sql $slice Das zu sichernde Slice
@@ -177,7 +205,7 @@ function backupSlice($slice, $trashArticleId, $trashSliceTable, $trashSliceMetaT
         $sliceSql->setValue('ctype_id', $slice->getValue('ctype_id') ?: 1);
         $sliceSql->setValue('module_id', $slice->getValue('module_id') ?: 0);
         $sliceSql->setValue('priority', $slice->getValue('priority') ?: 0);
-        $sliceSql->setValue('revision', $slice->hasValue('revision') ? $slice->getValue('revision') : 0);
+        $sliceSql->setValue('revision', $slice->hasValue('revision') ? (int)$slice->getValue('revision') : 0);
         
         // Status kopieren, falls vorhanden
         if ($slice->hasValue('status')) {
