@@ -50,34 +50,8 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
             ]);
             $sql->setValue('attributes', $attributes);
             
-            // Zusätzliche Metadaten sammeln, die von anderen AddOns stammen könnten
-            $allMetaAttributes = [];
-            $articleTable = rex::getTable('article');
-
-            // Alle Spalten der Artikeltabelle auslesen
-            $articleColumns = rex_sql::showColumns($articleTable);
-            $standardColumns = [
-                'id', 'parent_id', 'name', 'catname', 'catpriority', 'startarticle', 
-                'priority', 'path', 'status', 'createdate', 'updatedate', 
-                'template_id', 'clang_id', 'createuser', 'updateuser'
-            ];
-
-            // Alle Spalten durchgehen und nicht-standard Spalten als Meta-Attribute sammeln
-            foreach ($articleColumns as $column) {
-                $columnName = $column['name'];
-                if (!in_array($columnName, $standardColumns)) {
-                    // Wert aus der Artikeltabelle holen
-                    $metaValue = $article->getValue($columnName);
-                    if ($metaValue !== null) {
-                        $allMetaAttributes[$columnName] = $metaValue;
-                    }
-                }
-            }
-
-            // Meta-Attribute als JSON speichern (mit Behandlung von Sonderzeichen)
-            if (!empty($allMetaAttributes)) {
-                $sql->setValue('meta_attributes', json_encode($allMetaAttributes, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_TAG));
-            }
+            // Meta-Attribute des Artikels sammeln und speichern
+            saveMetaAttributes($sql, 'article', $article);
             
             $sql->insert();
             
@@ -140,6 +114,9 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
                                     }
                                 }
                                 
+                                // Meta-Attribute des Slices sammeln und speichern
+                                saveMetaAttributes($sliceSql, 'article_slice', $slice, $fieldTypes);
+                                
                                 $sliceSql->insert();
                             } catch (Exception $e) {
                                 // Fehler beim Einfügen des Slices loggen
@@ -152,6 +129,57 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
         }
     }
 });
+
+/**
+ * Hilfsfunktion zum Sammeln und Speichern von Meta-Attributen
+ * 
+ * @param rex_sql $sql Das SQL-Objekt, in dem die Meta-Attribute gespeichert werden sollen
+ * @param string $tableName Name der Tabelle, aus der Meta-Attribute gesammelt werden (ohne Präfix)
+ * @param rex_sql|rex_article $object Das Objekt, aus dem die Werte gelesen werden
+ * @param array $fieldTypes Optional: Array mit Feldtypen für Slices
+ */
+function saveMetaAttributes($sql, $tableName, $object, $fieldTypes = []) {
+    $allMetaAttributes = [];
+    $table = rex::getTable($tableName);
+
+    // Alle Spalten der Tabelle auslesen
+    $tableColumns = rex_sql::showColumns($table);
+    
+    // Standard-Spalten definieren, die wir nicht als Meta-Attribute speichern
+    $standardColumns = [
+        'id', 'parent_id', 'name', 'catname', 'catpriority', 'startarticle', 
+        'priority', 'path', 'status', 'createdate', 'updatedate', 
+        'template_id', 'clang_id', 'createuser', 'updateuser',
+        'article_id', 'ctype_id', 'module_id', 'revision'
+    ];
+    
+    // Für Slices: Feldtypen zu den Standard-Spalten hinzufügen
+    if ($tableName === 'article_slice' && !empty($fieldTypes)) {
+        foreach ($fieldTypes as $type => $count) {
+            for ($i = 1; $i <= $count; $i++) {
+                $standardColumns[] = $type . $i;
+            }
+        }
+    }
+
+    // Alle Spalten durchgehen und nicht-standard Spalten als Meta-Attribute sammeln
+    foreach ($tableColumns as $column) {
+        $columnName = $column['name'];
+        if (!in_array($columnName, $standardColumns)) {
+            // Wert aus dem Objekt holen
+            $metaValue = $object->getValue($columnName);
+            if ($metaValue !== null) {
+                $allMetaAttributes[$columnName] = $metaValue;
+            }
+        }
+    }
+
+    // Meta-Attribute als JSON speichern (mit Behandlung von Sonderzeichen)
+    if (!empty($allMetaAttributes)) {
+        $sql->setValue('meta_attributes', json_encode($allMetaAttributes, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_TAG));
+    }
+}
+
 // Cronjob registrieren, wenn das Cronjob AddOn installiert und aktiviert ist
 if (rex_addon::get('cronjob')->isAvailable()) {
     rex_cronjob_manager::registerType('rex_cronjob_trash_cleanup');
