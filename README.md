@@ -34,7 +34,6 @@ Einfach wie Kuchen essen:
 
 - Nur für Admins sichtbar (damit nicht jeder in deinem Müll wühlt)
 - Wenn die Elternkategorie weg ist, landet der wiederhergestellte Artikel einfach in der Hauptebene
-- Jeder wiederhergestellte Artikel bekommt eine neue ID (frisches Leben, frische ID!)
 
 ## Wer hat's gemacht?
 
