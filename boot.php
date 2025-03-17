@@ -132,32 +132,3 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
     return true;
 });
 
-// Seiteneinträge hinzufügen
-if (rex::isBackend() && rex::getUser()) {
-    if (rex::getUser()->isAdmin()) {
-        // Hauptmenüpunkt für das Trash-AddOn hinzufügen
-        rex_extension::register('PAGES_PREPARED', function (rex_extension_point $ep) {
-            $pages = $ep->getSubject();
-            
-            // Füge eine neue Seite zur Hauptnavigation hinzu
-            $page = new rex_be_page('trash', rex_i18n::msg('trash'));
-            $page->setHref(rex_url::backendPage('trash'));
-            $page->setIcon('fa fa-trash');
-            $page->setRequiredPermissions(['isAdmin']);
-            
-            // Zur Hauptnavigation hinzufügen
-            $mainPage = $page;
-            $mainPage->setPath(rex_path::addon('trash', 'pages/index.php'));
-            
-            // Unterseite für die Hauptansicht
-            $subpage = new rex_be_page('main', rex_i18n::msg('trash_main'));
-            $subpage->setHref(rex_url::backendPage('trash', ['subpage' => 'main']));
-            
-            // Unterseite zur Hauptseite hinzufügen
-            $mainPage->addSubpage($subpage);
-            
-            // Hauptseite zum EP-Objekt hinzufügen
-            $pages->addPage($mainPage);
-        });
-    }
-}
