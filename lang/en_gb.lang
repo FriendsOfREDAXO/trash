@@ -1,0 +1,37 @@
+trash = Trash
+trash_main = Overview
+trash_restore = Restore
+trash_delete = Delete
+trash_empty_trash = Empty trash
+trash_article_restored = Article has been restored
+trash_article_deleted = Article has been permanently deleted
+trash_emptied = Trash has been emptied
+trash_is_empty = The trash is empty
+trash_confirm_delete = Delete permanently?
+trash_confirm_empty_trash = Do you really want to empty the entire trash?
+trash_parent_category_missing = The original parent category no longer exists. The article has been restored to the root level.
+trash_restore_error = Error restoring the article
+trash_article_not_found = The article to restore was not found
+trash_article_restored_with_new_id = The article could not be restored under its original ID {0} and now has ID {1}.
+trash_original_id = Original ID
+trash_article_name = Name
+trash_category_name = Category
+trash_parent_id = Parent ID
+trash_languages = Languages
+trash_deleted_at = Deleted on
+trash_is_startarticle = Start article
+trash_slice_count = Number of slices
+trash_no_languages = None
+trash_delete_error = Error deleting the article
+trash_empty_error = Error emptying the trash
+
+# Cronjob
+trash_cronjob_name = Trash: Clean up old articles
+trash_cronjob_max_age = Maximum age
+trash_cronjob_max_age_never = Never delete
+trash_cronjob_max_age_day = day
+trash_cronjob_max_age_days = days
+trash_cronjob_max_age_zero = Maximum age is set to 0. No articles were deleted.
+trash_cronjob_deleted_count = {0} old articles were deleted from the trash
+trash_cronjob_no_articles_found = No articles to delete were found
+trash_cronjob_error = Error cleaning up the trash: {0}
