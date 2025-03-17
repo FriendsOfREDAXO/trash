@@ -276,18 +276,18 @@ if ($func === 'restore' && $articleId > 0) {
             }
             
             // Erfolgsmeldung anzeigen
-            $message = rex_view::success(rex_i18n::msg('article_restored'));
+            $message = rex_view::success(rex_i18n::msg('trash_article_restored'));
             if (!$parentExists) {
-                $message .= rex_view::warning(rex_i18n::msg('parent_category_missing'));
+                $message .= rex_view::warning(rex_i18n::msg('trash_parent_category_missing'));
             }
             if ($newArticleId != $original_id) {
-                $message .= rex_view::info(rex_i18n::msg('article_restored_with_new_id', $original_id, $newArticleId));
+                $message .= rex_view::info(rex_i18n::msg('trash_article_restored_with_new_id', $original_id, $newArticleId));
             }
         } else {
-            $message = rex_view::error(rex_i18n::msg('restore_error'));
+            $message = rex_view::error(rex_i18n::msg('trash_restore_error'));
         }
     } else {
-        $message = rex_view::error(rex_i18n::msg('article_not_found'));
+        $message = rex_view::error(rex_i18n::msg('trash_article_not_found'));
     }
 } elseif ($func === 'delete' && $articleId > 0) {
     // Artikel endgültig löschen
@@ -308,13 +308,13 @@ if ($func === 'restore' && $articleId > 0) {
         // Transaktion abschließen
         $sql->commit();
         
-        $message = rex_view::success(rex_i18n::msg('article_deleted'));
+        $message = rex_view::success(rex_i18n::msg('trash_article_deleted'));
     } catch (Exception $e) {
         // Im Fehlerfall Transaktion zurückrollen
         if ($sql->inTransaction()) {
             $sql->rollBack();
         }
-        $message = rex_view::error(rex_i18n::msg('delete_error') . ': ' . $e->getMessage());
+        $message = rex_view::error(rex_i18n::msg('trash_delete_error') . ': ' . $e->getMessage());
         rex_logger::logException($e);
     }
 } elseif ($func === 'empty') {
@@ -340,7 +340,7 @@ if ($func === 'restore' && $articleId > 0) {
         if ($sql->inTransaction()) {
             $sql->rollBack();
         }
-        $message = rex_view::error(rex_i18n::msg('empty_error') . ': ' . $e->getMessage());
+        $message = rex_view::error(rex_i18n::msg('trash_empty_error') . ': ' . $e->getMessage());
         rex_logger::logException($e);
     }
 }
@@ -365,14 +365,14 @@ $list->addTableAttribute('class', 'table-striped');
 $list->removeColumn('id');
 $list->removeColumn('attributes');
 $list->removeColumn('meta_attributes');
-$list->setColumnLabel('article_id', rex_i18n::msg('original_id'));
-$list->setColumnLabel('name', rex_i18n::msg('article_name'));
-$list->setColumnLabel('catname', rex_i18n::msg('category_name'));
-$list->setColumnLabel('parent_id', rex_i18n::msg('parent_id'));
-$list->setColumnLabel('languages', rex_i18n::msg('languages'));
-$list->setColumnLabel('deleted_at', rex_i18n::msg('deleted_at'));
-$list->setColumnLabel('startarticle', rex_i18n::msg('is_startarticle'));
-$list->setColumnLabel('slice_count', rex_i18n::msg('slice_count'));
+$list->setColumnLabel('article_id', rex_i18n::msg('trash_original_id'));
+$list->setColumnLabel('name', rex_i18n::msg('trash_article_name'));
+$list->setColumnLabel('catname', rex_i18n::msg('trash_category_name'));
+$list->setColumnLabel('parent_id', rex_i18n::msg('trash_parent_id'));
+$list->setColumnLabel('languages', rex_i18n::msg('trash_languages'));
+$list->setColumnLabel('deleted_at', rex_i18n::msg('trash_deleted_at'));
+$list->setColumnLabel('startarticle', rex_i18n::msg('trash_is_startarticle'));
+$list->setColumnLabel('slice_count', rex_i18n::msg('trash_slice_count'));
 
 // Formatierungen
 $list->setColumnFormat('deleted_at', 'date', 'd.m.Y H:i');
@@ -384,7 +384,7 @@ $list->setColumnFormat('status', 'custom', function($params) {
 });
 $list->setColumnFormat('languages', 'custom', function($params) {
     if (!$params['value']) {
-        return rex_i18n::msg('no_languages');
+        return rex_i18n::msg('trash_no_languages');
     }
     $langIds = explode(',', $params['value']);
     $names = [];
@@ -396,15 +396,15 @@ $list->setColumnFormat('languages', 'custom', function($params) {
 });
 
 // Aktionen definieren
-$list->addColumn('restore', '<i class="rex-icon rex-icon-refresh"></i> ' . rex_i18n::msg('restore'));
+$list->addColumn('restore', '<i class="rex-icon rex-icon-refresh"></i> ' . rex_i18n::msg('trash_restore'));
 $list->setColumnParams('restore', ['func' => 'restore', 'id' => '###id###']);
 
-$list->addColumn('delete', '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('delete'));
+$list->addColumn('delete', '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_delete'));
 $list->setColumnParams('delete', ['func' => 'delete', 'id' => '###id###']);
-$list->addLinkAttribute('delete', 'data-confirm', rex_i18n::msg('confirm_delete'));
+$list->addLinkAttribute('delete', 'data-confirm', rex_i18n::msg('trash_confirm_delete'));
 
 // Keine Einträge Meldung
-$list->setNoRowsMessage(rex_i18n::msg('trash_empty'));
+$list->setNoRowsMessage(rex_i18n::msg('trash_is_empty'));
 
 // Ausgabe der Liste
 $content = $list->get();
@@ -414,8 +414,8 @@ $buttons = '
 <div class="row">
     <div class="col-sm-12">
         <div class="pull-right">
-            <a href="' . rex_url::currentBackendPage(['func' => 'empty']) . '" class="btn btn-danger" data-confirm="' . rex_i18n::msg('confirm_empty_trash') . '">
-                <i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('empty_trash') . '
+            <a href="' . rex_url::currentBackendPage(['func' => 'empty']) . '" class="btn btn-danger" data-confirm="' . rex_i18n::msg('trash_confirm_empty_trash') . '">
+                <i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_empty_trash') . '
             </a>
         </div>
     </div>
