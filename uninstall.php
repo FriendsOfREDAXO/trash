@@ -3,6 +3,8 @@ try {
     // Tabellen für gelöschte Artikel und deren Slices löschen
     rex_sql_table::get(rex::getTable('trash_article'))->drop();
     rex_sql_table::get(rex::getTable('trash_article_slice'))->drop();
+    rex_sql_table::get(rex::getTable('trash_slice_meta'))->drop();
+    
     
     // Cache löschen
     rex_delete_cache();
