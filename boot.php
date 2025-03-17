@@ -50,8 +50,11 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
             ]);
             $sql->setValue('attributes', $attributes);
             
-            // Meta-Attribute des Artikels sammeln und speichern
-            saveMetaAttributes($sql, 'article', $article);
+            // Meta-Attribute als JSON speichern
+            $metaAttributes = collectMetaAttributes('article', $article);
+            if (!empty($metaAttributes)) {
+                $sql->setValue('meta_attributes', json_encode($metaAttributes, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_TAG));
+            }
             
             $sql->insert();
             
@@ -114,52 +117,21 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
                                     }
                                 }
                                 
-                                // Meta-Attribute des Slices sammeln und speichern
-                                saveMetaAttributes($sliceSql, 'article_slice', $slice, $fieldTypes);
-                                
+                                // Slice in Papierkorb speichern
                                 $sliceSql->insert();
                                 
                                 // ID des eingefügten Slices holen
                                 $sliceId = $sliceSql->getLastId();
                                 
                                 // Meta-Attribute in separater Tabelle speichern
-                                $allSliceMetaAttributes = [];
-                                $sliceTable = rex::getTable('article_slice');
-                                
-                                // Alle Spalten der Slice-Tabelle auslesen
-                                $sliceColumns = rex_sql::showColumns($sliceTable);
-                                
-                                // Standard-Spalten definieren, die wir nicht als Meta-Attribute speichern
-                                $standardSliceColumns = [
-                                    'id', 'article_id', 'clang_id', 'ctype_id', 'module_id', 'priority', 'revision',
-                                    'createdate', 'updatedate', 'createuser', 'updateuser', 'status'
-                                ];
-                                
-                                // Feldtypen zu den Standard-Spalten hinzufügen
-                                foreach ($fieldTypes as $type => $count) {
-                                    for ($i = 1; $i <= $count; $i++) {
-                                        $standardSliceColumns[] = $type . $i;
-                                    }
-                                }
-                                
-                                // Alle Spalten durchgehen und nicht-standard Spalten als Meta-Attribute sammeln
-                                foreach ($sliceColumns as $column) {
-                                    $columnName = $column['name'];
-                                    if (!in_array($columnName, $standardSliceColumns)) {
-                                        // Wert aus der Slice-Tabelle holen
-                                        $metaValue = $slice->getValue($columnName);
-                                        if ($metaValue !== null) {
-                                            $allSliceMetaAttributes[$columnName] = $metaValue;
-                                        }
-                                    }
-                                }
+                                $sliceMetaAttributes = collectMetaAttributes('article_slice', $slice, $fieldTypes);
                                 
                                 // Meta-Attribute speichern, wenn vorhanden
-                                if (!empty($allSliceMetaAttributes)) {
+                                if (!empty($sliceMetaAttributes)) {
                                     $metaSql = rex_sql::factory();
                                     $metaSql->setTable(rex::getTable('trash_slice_meta'));
                                     $metaSql->setValue('trash_slice_id', $sliceId);
-                                    $metaSql->setValue('meta_data', json_encode($allSliceMetaAttributes, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_TAG));
+                                    $metaSql->setValue('meta_data', json_encode($sliceMetaAttributes, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_TAG));
                                     $metaSql->insert();
                                 }
                             } catch (Exception $e) {
@@ -175,14 +147,14 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
 });
 
 /**
- * Hilfsfunktion zum Sammeln und Speichern von Meta-Attributen
+ * Hilfsfunktion zum Sammeln von Meta-Attributen
  * 
- * @param rex_sql $sql Das SQL-Objekt, in dem die Meta-Attribute gespeichert werden sollen
  * @param string $tableName Name der Tabelle, aus der Meta-Attribute gesammelt werden (ohne Präfix)
  * @param rex_sql|rex_article $object Das Objekt, aus dem die Werte gelesen werden
  * @param array $fieldTypes Optional: Array mit Feldtypen für Slices
+ * @return array Die gesammelten Meta-Attribute
  */
-function saveMetaAttributes($sql, $tableName, $object, $fieldTypes = []) {
+function collectMetaAttributes($tableName, $object, $fieldTypes = []) {
     $allMetaAttributes = [];
     $table = rex::getTable($tableName);
 
@@ -218,10 +190,7 @@ function saveMetaAttributes($sql, $tableName, $object, $fieldTypes = []) {
         }
     }
 
-    // Meta-Attribute als JSON speichern (mit Behandlung von Sonderzeichen)
-    if (!empty($allMetaAttributes)) {
-        $sql->setValue('meta_attributes', json_encode($allMetaAttributes, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_TAG));
-    }
+    return $allMetaAttributes;
 }
 
 // Cronjob registrieren, wenn das Cronjob AddOn installiert und aktiviert ist
