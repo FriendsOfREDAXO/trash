@@ -11,6 +11,7 @@ requires:
         structure: '^2.0.0'
 
 page:
+    block: system
     title: translate:trash
     perm: admin
     icon: rex-icon fa fa-trash
