@@ -16,12 +16,12 @@ Trash fängt deine gelöschten Artikel ab, bevor sie ins digitale Nirvana versch
 
 - **Automatische Rettung** - Trash schnappt sich jeden gelöschten Artikel blitzschnell
 - **Volle Power** - Alle Inhaltsblöcke, Module und sogar die Arbeitsversion bleiben erhalten
+- **Original-IDs** - Artikel werden wenn möglich unter ihrer ursprünglichen ID wiederhergestellt
+- **Meta-Daten Erhaltung** - Alle Metafelder von AddOns wie MetaInfo oder YRewrite bleiben erhalten
 - **One-Click-Wonder** - Artikel mit einem Klick komplett wiederherstellen
 - **Versionierungs-freundlich** - Deine Arbeitsversionen bleiben erhalten (**ja, wirklich!**)
 - **Mehrsprachig** - Deine Übersetzungen sind genauso wichtig wie die Hauptsprache
 - **Aufgeräumt** - Übersichtliche Liste zum einfachen Finden deiner verlorenen Schätze
-
-Na ja , ein paar Metas fehlen vielleicht. Aber immerhin.
 
 ## Der Alltag mit Trash
 
@@ -34,6 +34,15 @@ Einfach wie Kuchen essen:
 
 - Nur für Admins sichtbar (damit nicht jeder in deinem Müll wühlt)
 - Wenn die Elternkategorie weg ist, landet der wiederhergestellte Artikel einfach in der Hauptebene
+- Falls die Original-ID bereits vergeben ist, bekommt der wiederhergestellte Artikel automatisch eine neue ID
+- Meta-Daten werden nur wiederhergestellt, wenn die entsprechenden AddOns noch installiert sind
+
+## Technische Details
+
+- Erhält alle REDAXO-Artikel-Daten (Slices, Module, Revisionen)
+- Speichert Meta-Daten in JSON-Format für einfache Wiederherstellung
+- Unterstützt das Structure/Version Plugin (falls installiert)
+- Saubere Deinstallation mit vollständiger Entfernung aller Tabellen
 
 ## Wer hat's gemacht?
 
