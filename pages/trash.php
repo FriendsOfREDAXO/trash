@@ -19,6 +19,7 @@ $articleId = rex_request('id', 'int');
 // Tabellennamen definieren für gelöschte Artikel
 $trashTable = rex::getTable('trash_article');
 $trashSliceTable = rex::getTable('trash_article_slice');
+$trashSliceMetaTable = rex::getTable('trash_slice_meta');
 
 // Meldungen initialisieren
 $message = '';
@@ -108,7 +109,7 @@ if ($func === 'restore' && $articleId > 0) {
                     }
                 }
             } catch (Exception $e) {
-                $message = rex_view::error(rex_i18n::msg('restore_error') . ': ' . $e->getMessage());
+                $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . $e->getMessage());
                 $newArticleId = null;
             }
         } else {
@@ -142,7 +143,7 @@ if ($func === 'restore' && $articleId > 0) {
                 
                 $success = true;
             } catch (Exception $e) {
-                $message = rex_view::error(rex_i18n::msg('restore_error') . ': ' . $e->getMessage());
+                $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . $e->getMessage());
                 $newArticleId = null;
                 $success = false;
             }
@@ -224,32 +225,105 @@ if ($func === 'restore' && $articleId > 0) {
                             continue;
                         }
                         
-                        $sliceSql = rex_sql::factory();
-                        $sliceSql->setTable(rex::getTable('article_slice'));
-                        
-                        // Alle wichtigen Slice-Daten kopieren
-                        foreach ($slice as $key => $value) {
-                            // Diese Felder nicht kopieren
-                            if (in_array($key, ['id', 'trash_article_id', 'article_id'])) {
-                                continue;
+                        try {
+                            // Spalteninformationen der Slice-Tabelle abrufen (nur einmal)
+                            static $sliceColumns = null;
+                            if ($sliceColumns === null) {
+                                $columnInfo = rex_sql::showColumns(rex::getTable('article_slice'));
+                                $sliceColumns = [];
+                                
+                                // Vorhandene Spalten in ein Array überführen für schnelleren Zugriff
+                                foreach ($columnInfo as $column) {
+                                    $sliceColumns[$column['name']] = true;
+                                }
                             }
-                            $sliceSql->setValue($key, $value);
+                            
+                            // Erstelle ein Set von SQL-Wertepaaren für die INSERT-Query
+                            $insertData = [
+                                'article_id' => $newArticleId,
+                                'clang_id' => $slice['clang_id'],
+                                'ctype_id' => $slice['ctype_id'] ?: 1,
+                                'module_id' => $slice['module_id'] ?: 0,
+                                'revision' => $revision,
+                                'priority' => $currentPriority++,
+                                'createdate' => date('Y-m-d H:i:s'),
+                                'createuser' => rex::getUser()->getLogin(),
+                                'updatedate' => date('Y-m-d H:i:s'),
+                                'updateuser' => rex::getUser()->getLogin()
+                            ];
+                            
+                            // Status explizit behandeln, wenn vorhanden
+                            if (isset($slice['status'])) {
+                                $insertData['status'] = (int)$slice['status'];
+                            }
+                            
+                            // Feldwerte aus dem Slice kopieren
+                            $fieldTypes = [
+                                'value' => 20,
+                                'media' => 10,
+                                'medialist' => 10,
+                                'link' => 10,
+                                'linklist' => 10
+                            ];
+                            
+                            foreach ($fieldTypes as $type => $count) {
+                                for ($i = 1; $i <= $count; $i++) {
+                                    $field = $type . $i;
+                                    if (isset($slice[$field])) {
+                                        $insertData[$field] = $slice[$field];
+                                    }
+                                }
+                            }
+                            
+                            // Neues SQL-Objekt erstellen und nur mit gültigen Spalten befüllen
+                            $sliceSql = rex_sql::factory();
+                            $sliceSql->setTable(rex::getTable('article_slice'));
+                            
+                            // Nur die Spalten setzen, die in der Zieltabelle existieren
+                            foreach ($insertData as $key => $value) {
+                                if (isset($sliceColumns[$key])) {
+                                    $sliceSql->setValue($key, $value);
+                                }
+                            }
+                            
+                            // Slice einfügen
+                            $sliceSql->insert();
+                            
+                            // Neue Slice-ID holen
+                            $newSliceId = $sliceSql->getLastId();
+                            
+                            // Meta-Attribute aus der separaten Tabelle holen und anwenden
+                            $metaSql = rex_sql::factory();
+                            $metaSql->setQuery(
+                                'SELECT meta_data FROM ' . $trashSliceMetaTable . ' WHERE trash_slice_id = :id',
+                                ['id' => $slice['id']]
+                            );
+                            
+                            if ($metaSql->getRows() === 1) {
+                                $metaData = json_decode($metaSql->getValue('meta_data'), true);
+                                
+                                if (is_array($metaData) && !empty($metaData)) {
+                                    $updateSql = rex_sql::factory();
+                                    $updateSql->setTable(rex::getTable('article_slice'));
+                                    $updateSql->setWhere('id = :id', ['id' => $newSliceId]);
+                                    
+                                    $hasUpdates = false;
+                                    foreach ($metaData as $key => $value) {
+                                        if (isset($sliceColumns[$key])) {
+                                            $updateSql->setValue($key, $value);
+                                            $hasUpdates = true;
+                                        }
+                                    }
+                                    
+                                    if ($hasUpdates) {
+                                        $updateSql->update();
+                                    }
+                                }
+                            }
+                        } catch (rex_sql_exception $e) {
+                            rex_logger::logException($e);
+                            // Weiter mit dem nächsten Slice, auch wenn der aktuelle fehlgeschlagen ist
                         }
-                        
-                        // Neuen Artikel-ID setzen
-                        $sliceSql->setValue('article_id', $newArticleId);
-                        
-                        // Revision setzen
-                        $sliceSql->setValue('revision', $revision);
-                        
-                        // Die richtige Priorität setzen
-                        $sliceSql->setValue('priority', $currentPriority++);
-                        
-                        // Weitere Daten ergänzen
-                        $sliceSql->addGlobalCreateFields();
-                        $sliceSql->addGlobalUpdateFields();
-                        
-                        $sliceSql->insert();
                     }
                 }
             }
@@ -259,6 +333,15 @@ if ($func === 'restore' && $articleId > 0) {
             
             // Auch die Slices aus dem Papierkorb entfernen
             $sql->setQuery('DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :trash_id', ['trash_id' => $articleId]);
+            
+            // Auch die Slice-Meta-Daten aus dem Papierkorb entfernen
+            // Wir müssen alle Slices holen, um deren IDs für die Meta-Daten zu finden
+            $slice_ids = $sql->getArray('SELECT id FROM ' . $trashSliceTable . ' WHERE trash_article_id = :trash_id', ['trash_id' => $articleId]);
+            if (!empty($slice_ids)) {
+                foreach ($slice_ids as $slice) {
+                    $sql->setQuery('DELETE FROM ' . $trashSliceMetaTable . ' WHERE trash_slice_id = :slice_id', ['slice_id' => $slice['id']]);
+                }
+            }
             
             // Cache löschen und neu generieren
             rex_article_cache::delete($newArticleId);
@@ -292,17 +375,24 @@ if ($func === 'restore' && $articleId > 0) {
 } elseif ($func === 'delete' && $articleId > 0) {
     // Artikel endgültig löschen
     
-    // Zuerst die Slices entfernen
     $sql = rex_sql::factory();
     
     try {
         // Beginne eine Transaktion, damit entweder alles oder nichts gelöscht wird
         $sql->beginTransaction();
         
-        // Zuerst die Slices entfernen
+        // Alle Slice-IDs holen, um die Meta-Daten zu löschen
+        $slice_ids = $sql->getArray('SELECT id FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id', ['id' => $articleId]);
+        
+        // Für jede Slice-ID die Meta-Daten löschen
+        foreach ($slice_ids as $slice) {
+            $sql->setQuery('DELETE FROM ' . $trashSliceMetaTable . ' WHERE trash_slice_id = :slice_id', ['slice_id' => $slice['id']]);
+        }
+        
+        // Dann die Slices entfernen
         $sql->setQuery('DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id', ['id' => $articleId]);
         
-        // Dann den Artikel selbst
+        // Zuletzt den Artikel selbst
         $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE id = :id', ['id' => $articleId]);
         
         // Transaktion abschließen
@@ -325,10 +415,13 @@ if ($func === 'restore' && $articleId > 0) {
         // Beginne eine Transaktion, damit entweder alles oder nichts gelöscht wird
         $sql->beginTransaction();
         
-        // Zuerst alle Slices entfernen
+        // Zuerst alle Slice-Meta-Daten löschen
+        $sql->setQuery('DELETE FROM ' . $trashSliceMetaTable);
+        
+        // Dann alle Slices entfernen
         $sql->setQuery('DELETE FROM ' . $trashSliceTable);
         
-        // Dann alle Artikel
+        // Zuletzt alle Artikel
         $sql->setQuery('DELETE FROM ' . $trashTable);
         
         // Transaktion abschließen
