@@ -5,6 +5,7 @@ delete = Löschen
 empty_trash = Papierkorb leeren
 article_restored = Artikel wurde wiederhergestellt
 article_deleted = Artikel wurde gelöscht
+trah_article_deleted = Artikel wurde endgültig gelöscht
 trash_emptied = Papierkorb wurde geleert
 trash_empty = Der Papierkorb ist leer
 confirm_delete = Wirklich löschen?
