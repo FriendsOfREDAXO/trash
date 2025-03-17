@@ -13,7 +13,6 @@ if (!rex::getUser()->isAdmin()) {
 }
 
 // Durchführung von Aktionen (Wiederherstellen oder Endgültig löschen)
-$func = rex_request('func', 'string');
 $articleId = rex_request('id', 'int');
 
 // Tabellennamen definieren für gelöschte Artikel
@@ -299,7 +298,7 @@ if ($func === 'restore' && $articleId > 0) {
     // Dann den Artikel selbst
     $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE id = :id', ['id' => $articleId]);
     
-    $message = rex_view::success(rex_i18n::msg('article_deleted'));
+    $message = rex_view::success(rex_i18n::msg('trash_article_deleted'));
 } elseif ($func === 'empty') {
     // Papierkorb leeren
     $sql = rex_sql::factory();
