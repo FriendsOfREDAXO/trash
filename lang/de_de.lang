@@ -24,3 +24,14 @@ trash_slice_count = Anzahl Slices
 trash_no_languages = Keine
 trash_delete_error = Fehler beim Löschen des Artikels
 trash_empty_error = Fehler beim Leeren des Papierkorbs
+
+# Cronjob
+trash_cronjob_name = Trash: Alte Artikel aufräumen
+trash_cronjob_max_age = Maximales Alter
+trash_cronjob_max_age_never = Nie löschen
+trash_cronjob_max_age_day = Tag
+trash_cronjob_max_age_days = Tage
+trash_cronjob_max_age_zero = Maximales Alter ist auf 0 gesetzt. Es wurden keine Artikel gelöscht.
+trash_cronjob_deleted_count = {0} alte Artikel wurden aus dem Papierkorb gelöscht
+trash_cronjob_no_articles_found = Keine zu löschenden Artikel gefunden
+trash_cronjob_error = Fehler beim Aufräumen des Papierkorbs: {0}
