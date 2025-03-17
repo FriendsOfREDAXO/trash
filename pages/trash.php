@@ -154,6 +154,18 @@ if ($func === 'restore' && $articleId > 0) {
                 $newArticleId = $original_id;
                 
                 try {
+                    // Zunächst überprüfen, ob schon Artikel mit dieser ID existieren (für alle Sprachen)
+                    $checkSql = rex_sql::factory();
+                    $checkSql->setQuery('SELECT * FROM ' . rex::getTable('article') . ' WHERE id = :id', ['id' => $original_id]);
+                    
+                    if ($checkSql->getRows() > 0) {
+                        // Es existiert bereits ein Artikel mit dieser ID - ungewöhnlicher Fall
+                        rex_logger::factory()->warning('Trash: Versuch, Artikel mit ID ' . $original_id . ' wiederherzustellen, aber es existiert bereits ein Artikel mit dieser ID');
+                        
+                        // Wir werfen eine Exception, um in den "neuen Artikel erstellen"-Pfad zu gehen
+                        throw new Exception('Es existiert bereits ein Artikel mit der ID ' . $original_id);
+                    }
+                    
                     // Artikel direkt mit Original-ID in die Datenbank einfügen
                     $articleSql = rex_sql::factory();
                     $articleSql->setTable(rex::getTable('article'));
@@ -166,7 +178,10 @@ if ($func === 'restore' && $articleId > 0) {
                     $articleSql->setValue('path', $attributes['path'] ?? '|');
                     $articleSql->setValue('status', $status);
                     $articleSql->setValue('template_id', $attributes['template_id'] ?? 1);
-                    $articleSql->setValue('startarticle', $startarticle);
+                    
+                    // Startartikel-Status explizit setzen und prüfen
+                    $articleSql->setValue('startarticle', (int)$startarticle);
+                    rex_logger::factory()->info('Trash: Artikel ' . $original_id . ' wird wiederhergestellt mit startarticle=' . $startarticle);
                     
                     // Korrekte Formatierung der Datumsfelder sicherstellen
                     $articleSql->setValue('createdate', formatDateIfNeeded($attributes['createdate'] ?? date('Y-m-d H:i:s')));
@@ -180,8 +195,37 @@ if ($func === 'restore' && $articleId > 0) {
                         $articleSql->insert();
                     }
                     
+                    // Nach dem Einfügen nochmal prüfen, ob der Artikel korrekt angelegt wurde
+                    $verifySql = rex_sql::factory();
+                    $verifySql->setQuery('SELECT * FROM ' . rex::getTable('article') . ' WHERE id = :id', ['id' => $original_id]);
+                    
+                    if ($verifySql->getRows() === 0) {
+                        throw new Exception('Der Artikel konnte nicht in der Datenbank gefunden werden, obwohl er gerade eingefügt wurde');
+                    }
+                    
+                    // Explizit prüfen, ob der startarticle-Wert korrekt gesetzt wurde
+                    $verifyStartarticle = false;
+                    foreach ($verifySql as $row) {
+                        if ((int)$row->getValue('startarticle') === (int)$startarticle) {
+                            $verifyStartarticle = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!$verifyStartarticle) {
+                        rex_logger::factory()->warning('Trash: startarticle-Wert wurde nicht korrekt gesetzt für Artikel ' . $original_id);
+                        
+                        // Korrektur versuchen
+                        $fixSql = rex_sql::factory();
+                        $fixSql->setTable(rex::getTable('article'));
+                        $fixSql->setWhere('id = :id', ['id' => $original_id]);
+                        $fixSql->setValue('startarticle', (int)$startarticle);
+                        $fixSql->update();
+                    }
+                    
                     $success = true;
                 } catch (Exception $e) {
+                    rex_logger::logException($e);
                     $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . $e->getMessage());
                     $newArticleId = null;
                     $success = false;
