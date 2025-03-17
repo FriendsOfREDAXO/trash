@@ -118,6 +118,50 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
                                 saveMetaAttributes($sliceSql, 'article_slice', $slice, $fieldTypes);
                                 
                                 $sliceSql->insert();
+                                
+                                // ID des eingefügten Slices holen
+                                $sliceId = $sliceSql->getLastId();
+                                
+                                // Meta-Attribute in separater Tabelle speichern
+                                $allSliceMetaAttributes = [];
+                                $sliceTable = rex::getTable('article_slice');
+                                
+                                // Alle Spalten der Slice-Tabelle auslesen
+                                $sliceColumns = rex_sql::showColumns($sliceTable);
+                                
+                                // Standard-Spalten definieren, die wir nicht als Meta-Attribute speichern
+                                $standardSliceColumns = [
+                                    'id', 'article_id', 'clang_id', 'ctype_id', 'module_id', 'priority', 'revision',
+                                    'createdate', 'updatedate', 'createuser', 'updateuser', 'status'
+                                ];
+                                
+                                // Feldtypen zu den Standard-Spalten hinzufügen
+                                foreach ($fieldTypes as $type => $count) {
+                                    for ($i = 1; $i <= $count; $i++) {
+                                        $standardSliceColumns[] = $type . $i;
+                                    }
+                                }
+                                
+                                // Alle Spalten durchgehen und nicht-standard Spalten als Meta-Attribute sammeln
+                                foreach ($sliceColumns as $column) {
+                                    $columnName = $column['name'];
+                                    if (!in_array($columnName, $standardSliceColumns)) {
+                                        // Wert aus der Slice-Tabelle holen
+                                        $metaValue = $slice->getValue($columnName);
+                                        if ($metaValue !== null) {
+                                            $allSliceMetaAttributes[$columnName] = $metaValue;
+                                        }
+                                    }
+                                }
+                                
+                                // Meta-Attribute speichern, wenn vorhanden
+                                if (!empty($allSliceMetaAttributes)) {
+                                    $metaSql = rex_sql::factory();
+                                    $metaSql->setTable(rex::getTable('trash_slice_meta'));
+                                    $metaSql->setValue('trash_slice_id', $sliceId);
+                                    $metaSql->setValue('meta_data', json_encode($allSliceMetaAttributes, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_TAG));
+                                    $metaSql->insert();
+                                }
                             } catch (Exception $e) {
                                 // Fehler beim Einfügen des Slices loggen
                                 rex_logger::logException($e);
