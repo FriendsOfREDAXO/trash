@@ -13,6 +13,7 @@ if (!rex::getUser()->isAdmin()) {
 }
 
 // Durchführung von Aktionen (Wiederherstellen oder Endgültig löschen)
+$func = rex_request('func', 'string');
 $articleId = rex_request('id', 'int');
 
 // Tabellennamen definieren für gelöschte Artikel
@@ -293,18 +294,55 @@ if ($func === 'restore' && $articleId > 0) {
     
     // Zuerst die Slices entfernen
     $sql = rex_sql::factory();
-    $sql->setQuery('DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id', ['id' => $articleId]);
     
-    // Dann den Artikel selbst
-    $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE id = :id', ['id' => $articleId]);
-    
-    $message = rex_view::success(rex_i18n::msg('trash_article_deleted'));
+    try {
+        // Beginne eine Transaktion, damit entweder alles oder nichts gelöscht wird
+        $sql->beginTransaction();
+        
+        // Zuerst die Slices entfernen
+        $sql->setQuery('DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id', ['id' => $articleId]);
+        
+        // Dann den Artikel selbst
+        $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE id = :id', ['id' => $articleId]);
+        
+        // Transaktion abschließen
+        $sql->commit();
+        
+        $message = rex_view::success(rex_i18n::msg('article_deleted'));
+    } catch (Exception $e) {
+        // Im Fehlerfall Transaktion zurückrollen
+        if ($sql->inTransaction()) {
+            $sql->rollBack();
+        }
+        $message = rex_view::error(rex_i18n::msg('delete_error') . ': ' . $e->getMessage());
+        rex_logger::logException($e);
+    }
 } elseif ($func === 'empty') {
     // Papierkorb leeren
     $sql = rex_sql::factory();
-    $sql->setQuery('DELETE FROM ' . $trashSliceTable);
-    $sql->setQuery('DELETE FROM ' . $trashTable);
-    $message = rex_view::success(rex_i18n::msg('trash_emptied'));
+    
+    try {
+        // Beginne eine Transaktion, damit entweder alles oder nichts gelöscht wird
+        $sql->beginTransaction();
+        
+        // Zuerst alle Slices entfernen
+        $sql->setQuery('DELETE FROM ' . $trashSliceTable);
+        
+        // Dann alle Artikel
+        $sql->setQuery('DELETE FROM ' . $trashTable);
+        
+        // Transaktion abschließen
+        $sql->commit();
+        
+        $message = rex_view::success(rex_i18n::msg('trash_emptied'));
+    } catch (Exception $e) {
+        // Im Fehlerfall Transaktion zurückrollen
+        if ($sql->inTransaction()) {
+            $sql->rollBack();
+        }
+        $message = rex_view::error(rex_i18n::msg('empty_error') . ': ' . $e->getMessage());
+        rex_logger::logException($e);
+    }
 }
 
 // Ausgabe der Liste der Artikel im Papierkorb
