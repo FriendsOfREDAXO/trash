@@ -49,6 +49,36 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
                 'updateuser' => $article->getValue('updateuser')
             ]);
             $sql->setValue('attributes', $attributes);
+            
+            // Zusätzliche Metadaten sammeln, die von anderen AddOns stammen könnten
+            $allMetaAttributes = [];
+            $articleTable = rex::getTable('article');
+
+            // Alle Spalten der Artikeltabelle auslesen
+            $articleColumns = rex_sql::showColumns($articleTable);
+            $standardColumns = [
+                'id', 'parent_id', 'name', 'catname', 'catpriority', 'startarticle', 
+                'priority', 'path', 'status', 'createdate', 'updatedate', 
+                'template_id', 'clang_id', 'createuser', 'updateuser'
+            ];
+
+            // Alle Spalten durchgehen und nicht-standard Spalten als Meta-Attribute sammeln
+            foreach ($articleColumns as $column) {
+                $columnName = $column['name'];
+                if (!in_array($columnName, $standardColumns)) {
+                    // Wert aus der Artikeltabelle holen
+                    $metaValue = $article->getValue($columnName);
+                    if ($metaValue !== null) {
+                        $allMetaAttributes[$columnName] = $metaValue;
+                    }
+                }
+            }
+
+            // Meta-Attribute als JSON speichern (mit Behandlung von Sonderzeichen)
+            if (!empty($allMetaAttributes)) {
+                $sql->setValue('meta_attributes', json_encode($allMetaAttributes, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_TAG));
+            }
+            
             $sql->insert();
             
             // Neue ID des Eintrags im Papierkorb
