@@ -24,30 +24,7 @@ $trashSliceMetaTable = rex::getTable('trash_slice_meta');
 // Meldungen initialisieren
 $message = '';
 
-/**
- * Hilfsfunktion, um sicherzustellen, dass ein Datum im Format Y-m-d H:i:s vorliegt
- * 
- * @param string $date Das zu formatierende Datum
- * @return string Korrekt formatiertes Datum
- */
-function formatDateIfNeeded($date) {
-    if (!$date) {
-        return date('Y-m-d H:i:s');
-    }
-    
-    // Prüfen, ob das Datum bereits das richtige Format hat
-    if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $date)) {
-        return $date;
-    }
-    
-    // Versuchen, das Datum zu parsen und neu zu formatieren
-    $timestamp = strtotime($date);
-    if ($timestamp === false) {
-        return date('Y-m-d H:i:s');
-    }
-    
-    return date('Y-m-d H:i:s', $timestamp);
-}
+
 
 // Aktionen verarbeiten
 if ($func === 'restore' && $articleId > 0) {
