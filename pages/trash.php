@@ -1,7 +1,6 @@
 <?php
 /**
  * Trash AddOn - Main backend page
- * Korrigierte Version, die mit dem Version-Plugin und anderen Artikeln kompatibel ist
  * 
  * @package redaxo\trash
  */
@@ -29,9 +28,9 @@ $message = '';
 $debug = false; // Auf true setzen für Entwicklungszwecke
 
 
+
 /**
- * Direkte Artikel-Einfügung ohne die Service-Klassen zu nutzen
- * Diese Version vermeidet Probleme mit dem Debug-Modus
+ * Direkte Artikel-Einfügung mit verbesserter ID-Behandlung
  * 
  * @param array $articleData Die Daten für den Artikel
  * @return array [success, articleId, errorMessage]
@@ -44,6 +43,32 @@ function insertArticleDirectly($articleData) {
         $tableName = rex::getTablePrefix() . 'article';
         if (empty($tableName)) {
             return [false, null, "Tabellenname ist leer."];
+        }
+        
+        // Prüfen, ob mit der angegebenen ID bereits ein Artikel existiert
+        if (isset($articleData['id']) && $articleData['id'] > 0) {
+            $checkSql = rex_sql::factory();
+            $checkSql->setQuery("SELECT id FROM " . $tableName . " WHERE id = :id LIMIT 1", 
+                ['id' => $articleData['id']]);
+            
+            // Wenn ein Artikel mit dieser ID gefunden wurde, Auto-Increment verwenden
+            if ($checkSql->getRows() > 0) {
+                if ($debug) {
+                    echo '<pre>HINWEIS: Artikel mit ID ' . $articleData['id'] . ' existiert bereits. Verwende Auto-Increment.</pre>';
+                }
+                
+                // Neue ID generieren
+                $maxSql = rex_sql::factory();
+                $maxSql->setQuery("SELECT MAX(id) as max_id FROM " . $tableName);
+                $maxId = $maxSql->getValue('max_id');
+                
+                // Neue ID festlegen (maximal vorhandene ID + 1)
+                $articleData['id'] = (int)$maxId + 1;
+                
+                if ($debug) {
+                    echo '<pre>HINWEIS: Neue generierte ID: ' . $articleData['id'] . '</pre>';
+                }
+            }
         }
         
         // Für jede Sprache einen Eintrag erstellen
@@ -87,6 +112,7 @@ function insertArticleDirectly($articleData) {
             }
         }
         
+        // Erfolgreiche Eingabe
         return [true, $insertedId];
     } catch (Exception $e) {
         rex_logger::logException($e);
@@ -108,7 +134,16 @@ if ($func === 'restore' && $articleId > 0) {
         $catname = $sql->getValue('catname');
         $catpriority = $sql->getValue('catpriority');
         $status = $sql->getValue('status');
-        $attributes = json_decode($sql->getValue('attributes'), true);
+        // Direkte Verwendung der Spalten anstelle von attributes JSON
+        $path = $sql->getValue('path');
+        $priority = $sql->getValue('priority');
+        $template_id = $sql->getValue('template_id');
+        $createdate = fixDateFormat($sql->getValue('createdate'));
+        $createuser = $sql->getValue('createuser');
+        $updatedate = fixDateFormat($sql->getValue('updatedate'));
+        $updateuser = $sql->getValue('updateuser');
+        $revision = $sql->getValue('revision');
+        
         $startarticle = $sql->getValue('startarticle');
         
         // Meta-Attribute laden (falls vorhanden)
@@ -145,21 +180,17 @@ if ($func === 'restore' && $articleId > 0) {
                 'name' => $name,
                 'catname' => $catname,
                 'catpriority' => $catpriority,
-                'priority' => $attributes['priority'] ?? 1,
-                'path' => $attributes['path'] ?? '|',
+                'priority' => $priority,
+                'path' => $path,
                 'status' => $status,
-                'template_id' => $attributes['template_id'] ?? 1,
+                'template_id' => $template_id,
                 'startarticle' => $startarticle,
-                'createdate' => $attributes['createdate'] ?? date('Y-m-d H:i:s'),
-                'createuser' => $attributes['createuser'] ?? rex::getUser()->getLogin(),
+                'createdate' => $createdate,
+                'createuser' => !empty($createuser) ? $createuser : rex::getUser()->getLogin(),
                 'updatedate' => date('Y-m-d H:i:s'),
-                'updateuser' => rex::getUser()->getLogin()
+                'updateuser' => rex::getUser()->getLogin(),
+                'revision' => 0 // Auf Live-Version setzen
             ];
-            
-            // Revision auf 0 setzen, wenn das Version-Plugin verwendet wird
-            if (rex_plugin::get('structure', 'version')->isAvailable()) {
-                $articleData['revision'] = 0;
-            }
             
             if ($debug) {
                 echo '<pre>Versuche neuen Artikel zu erstellen: ' . print_r($articleData, true) . '</pre>';
@@ -184,21 +215,17 @@ if ($func === 'restore' && $articleId > 0) {
                 'name' => $name,
                 'catname' => $catname,
                 'catpriority' => $catpriority,
-                'priority' => $attributes['priority'] ?? 1,
-                'path' => $attributes['path'] ?? '|',
+                'priority' => $priority,
+                'path' => $path,
                 'status' => $status,
-                'template_id' => $attributes['template_id'] ?? 1,
+                'template_id' => $template_id,
                 'startarticle' => $startarticle,
-                'createdate' => $attributes['createdate'] ?? date('Y-m-d H:i:s'),
-                'createuser' => $attributes['createuser'] ?? rex::getUser()->getLogin(),
+                'createdate' => $createdate,
+                'createuser' => !empty($createuser) ? $createuser : rex::getUser()->getLogin(),
                 'updatedate' => date('Y-m-d H:i:s'),
-                'updateuser' => rex::getUser()->getLogin()
+                'updateuser' => rex::getUser()->getLogin(),
+                'revision' => 0 // Auf Live-Version setzen
             ];
-            
-            // Wichtig: Revision auf 0 setzen, wenn das Version-Plugin verwendet wird
-            if (rex_plugin::get('structure', 'version')->isAvailable()) {
-                $articleData['revision'] = 0;
-            }
             
             if ($debug) {
                 echo '<pre>Versuche Original-Artikel wiederherzustellen mit ID ' . $original_id . ': ' . print_r($articleData, true) . '</pre>';
@@ -227,8 +254,7 @@ if ($func === 'restore' && $articleId > 0) {
                 }
             }
         }
-        
-        if ($newArticleId) {
+		if ($newArticleId) {
             // Meta-Attribute wiederherstellen
             if ($metaAttributes) {
                 try {
@@ -241,9 +267,6 @@ if ($func === 'restore' && $articleId > 0) {
                         $existingColumns[$column['name']] = true;
                     }
                     
-                    $metaSql = rex_sql::factory();
-                    if ($debug) $metaSql->setDebug();
-                    
                     foreach (rex_clang::getAllIds() as $clangId) {
                         // Für jede Sprache die Meta-Attribute setzen
                         
@@ -251,16 +274,18 @@ if ($func === 'restore' && $articleId > 0) {
                         $query = "UPDATE " . rex::getTable('article') . " SET ";
                         $params = [];
                         $hasValues = false;
+                        $first = true;
                         
                         foreach ($metaAttributes as $key => $value) {
                             // Prüfen ob die Spalte existiert (AddOn könnte deinstalliert worden sein)
                             if (isset($existingColumns[$key])) {
-                                if ($hasValues) {
+                                if (!$first) {
                                     $query .= ", ";
                                 }
                                 $query .= "`" . $key . "` = :" . $key;
                                 $params[$key] = $value;
                                 $hasValues = true;
+                                $first = false;
                             }
                         }
                         
@@ -274,6 +299,8 @@ if ($func === 'restore' && $articleId > 0) {
                                 echo '<pre>Meta-Update Params: ' . print_r($params, true) . '</pre>';
                             }
                             
+                            $metaSql = rex_sql::factory();
+                            if ($debug) $metaSql->setDebug();
                             $metaSql->setQuery($query, $params);
                         }
                     }
@@ -380,14 +407,14 @@ if ($func === 'restore' && $articleId > 0) {
                             }
                             
                             // SQL-Query aufbauen
-                            $firstParam = true;
+                            $first = true;
                             foreach ($params as $key => $value) {
                                 if (isset($sliceColumns[$key])) {
-                                    if (!$firstParam) {
+                                    if (!$first) {
                                         $query .= ", ";
                                     }
                                     $query .= "`" . $key . "` = :" . $key;
-                                    $firstParam = false;
+                                    $first = false;
                                 }
                             }
                             
@@ -419,17 +446,17 @@ if ($func === 'restore' && $articleId > 0) {
                                     $updateQuery = "UPDATE " . rex::getTable('article_slice') . " SET ";
                                     $updateParams = [];
                                     $hasUpdates = false;
-                                    $firstUpdate = true;
+                                    $updateFirst = true;
                                     
                                     foreach ($metaData as $key => $value) {
                                         if (isset($sliceColumns[$key])) {
-                                            if (!$firstUpdate) {
+                                            if (!$updateFirst) {
                                                 $updateQuery .= ", ";
                                             }
                                             $updateQuery .= "`" . $key . "` = :" . $key;
                                             $updateParams[$key] = $value;
                                             $hasUpdates = true;
-                                            $firstUpdate = false;
+                                            $updateFirst = false;
                                         }
                                     }
                                     
@@ -591,7 +618,6 @@ $list->addTableAttribute('class', 'table-striped');
 
 // Spalten definieren
 $list->removeColumn('id');
-$list->removeColumn('attributes');
 $list->removeColumn('meta_attributes');
 $list->setColumnLabel('article_id', rex_i18n::msg('trash_original_id'));
 $list->setColumnLabel('name', rex_i18n::msg('trash_article_name'));
