@@ -24,8 +24,6 @@ $trashSliceMetaTable = rex::getTable('trash_slice_meta');
 // Meldungen initialisieren
 $message = '';
 
-
-
 // Aktionen verarbeiten
 if ($func === 'restore' && $articleId > 0) {
     try {
