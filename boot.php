@@ -49,14 +49,29 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
             $sql->setValue('parent_id', $parentId);
             $sql->setValue('name', $article->getValue('name'));
             $sql->setValue('catname', $article->getValue('catname'));
-            $sql->setValue('catpriority', $article->getValue('catpriority'));
             $sql->setValue('status', $article->getValue('status'));
             $sql->setValue('startarticle', $article->isStartArticle() ? 1 : 0);
             $sql->setValue('deleted_at', date('Y-m-d H:i:s'));
             
+            // Korrekte Speicherung der Prioritäten je nach Artikeltyp
+            if ($article->isStartArticle()) {
+                // Bei Startartikeln (Kategorien) die catpriority speichern
+                $sql->setValue('catpriority', $article->getValue('catpriority'));
+                // Für Startartikel auch die Kategorie-Priorität als reguläre Priorität speichern
+                $sql->setValue('priority', $article->getValue('priority') ?: $article->getValue('catpriority'));
+            } else {
+                // Bei normalen Artikeln die priority speichern
+                $sql->setValue('priority', $article->getValue('priority'));
+                // Falls es einen catpriority-Wert gibt, auch diesen speichern (sollte eigentlich nicht vorkommen)
+                if ($article->hasValue('catpriority')) {
+                    $sql->setValue('catpriority', $article->getValue('catpriority'));
+                } else {
+                    $sql->setValue('catpriority', 0);
+                }
+            }
+            
             // Direkte Speicherung der Attribute als eigene Spalten mit Datumsfixierung
             $sql->setValue('path', $article->getValue('path'));
-            $sql->setValue('priority', $article->getValue('priority'));
             $sql->setValue('template_id', $article->getValue('template_id'));
             
             // Hier die Datumswerte korrekt formatieren

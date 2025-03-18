@@ -28,12 +28,100 @@ $message = '';
 $debug = false; // Auf true setzen für Entwicklungszwecke
 
 
+/**
+ * Prüft, ob eine Priorität in einer Kategorie bereits vergeben ist
+ * 
+ * @param int $parentId ID der Elternkategorie
+ * @param int $priority Die zu prüfende Priorität
+ * @param bool $isStartarticle Ob es sich um eine Kategorie handelt
+ * @return bool True wenn die Priorität bereits vergeben ist, sonst false
+ */
+function isPriorityTaken($parentId, $priority, $isStartarticle = false) {
+    $sql = rex_sql::factory();
+    
+    if ($isStartarticle) {
+        // Für Kategorien: catpriority prüfen
+        $query = 'SELECT id FROM ' . rex::getTablePrefix() . 'article 
+                 WHERE parent_id = :parent_id AND startarticle = 1 AND catpriority = :priority LIMIT 1';
+    } else {
+        // Für Artikel: priority prüfen
+        $query = 'SELECT id FROM ' . rex::getTablePrefix() . 'article 
+                 WHERE parent_id = :parent_id AND startarticle = 0 AND priority = :priority LIMIT 1';
+    }
+    
+    $sql->setQuery($query, [
+        'parent_id' => $parentId,
+        'priority' => $priority
+    ]);
+    
+    return $sql->getRows() > 0;
+}
 
 /**
- * Direkte Artikel-Einfügung mit verbesserter ID-Behandlung
+ * Ermittelt eine verfügbare Priorität für den Artikel
+ * Versucht zuerst die gewünschte Priorität zu verwenden, 
+ * falls diese bereits belegt ist, wird die nächste freie Priorität verwendet
+ * 
+ * @param int $parentId ID der Elternkategorie
+ * @param int $desiredPriority Die gewünschte Priorität
+ * @param bool $isStartarticle Ob es sich um eine Kategorie handelt
+ * @return int Eine verfügbare Priorität
+ */
+function getAvailablePriority($parentId, $desiredPriority, $isStartarticle = false) {
+    // Wenn die gewünschte Priorität nicht belegt ist, kann sie verwendet werden
+    if (!isPriorityTaken($parentId, $desiredPriority, $isStartarticle)) {
+        return $desiredPriority;
+    }
+    
+    // Sonst die nächsthöchste freie Priorität finden
+    $priority = $desiredPriority;
+    while (isPriorityTaken($parentId, $priority, $isStartarticle)) {
+        $priority++;
+    }
+    
+    return $priority;
+}
+
+/**
+ * Ermittelt die nächste verfügbare Priorität für einen Artikel in seiner Kategorie
+ * 
+ * @param int $parentId Die ID der Eltern-Kategorie
+ * @param bool $isStartarticle Ob es sich um einen Startartikel handelt
+ * @return int Die nächste verfügbare Priorität
+ */
+function getNextPriority($parentId, $isStartarticle = false) {
+    $sql = rex_sql::factory();
+    
+    if ($isStartarticle) {
+        // Bei Startartikeln (Kategorien) maximale catpriority + 1 in der Elternkategorie verwenden
+        $sql->setQuery('SELECT MAX(catpriority) as max_prio FROM ' . rex::getTablePrefix() . 'article 
+                      WHERE parent_id = :parent_id AND startarticle = 1', 
+                      ['parent_id' => $parentId]);
+        
+        if ($sql->getRows() > 0 && $sql->getValue('max_prio') !== null) {
+            return (int)$sql->getValue('max_prio') + 1;
+        }
+        
+        return 1; // Fallback: erste Position
+    } else {
+        // Bei normalen Artikeln maximale priority + 1 in der Kategorie verwenden
+        $sql->setQuery('SELECT MAX(priority) as max_prio FROM ' . rex::getTablePrefix() . 'article 
+                      WHERE parent_id = :parent_id AND startarticle = 0', 
+                      ['parent_id' => $parentId]);
+        
+        if ($sql->getRows() > 0 && $sql->getValue('max_prio') !== null) {
+            return (int)$sql->getValue('max_prio') + 1;
+        }
+        
+        return 1; // Fallback: erste Position
+    }
+}
+
+/**
+ * Direkte Artikel-Einfügung mit verbesserter ID- und Prioritätsbehandlung für REDAXO
  * 
  * @param array $articleData Die Daten für den Artikel
- * @return array [success, articleId, errorMessage]
+ * @return array [success, articleId, errorMessage, idChanged, originalRequestedId]
  */
 function insertArticleDirectly($articleData) {
     global $debug;
@@ -42,8 +130,11 @@ function insertArticleDirectly($articleData) {
         // Tabellennamen direkt verwenden statt getTable() aufzurufen
         $tableName = rex::getTablePrefix() . 'article';
         if (empty($tableName)) {
-            return [false, null, "Tabellenname ist leer."];
+            return [false, null, "Tabellenname ist leer.", false, 0];
         }
+        
+        $idChanged = false;
+        $originalId = $articleData['id'];
         
         // Prüfen, ob mit der angegebenen ID bereits ein Artikel existiert
         if (isset($articleData['id']) && $articleData['id'] > 0) {
@@ -51,22 +142,41 @@ function insertArticleDirectly($articleData) {
             $checkSql->setQuery("SELECT id FROM " . $tableName . " WHERE id = :id LIMIT 1", 
                 ['id' => $articleData['id']]);
             
-            // Wenn ein Artikel mit dieser ID gefunden wurde, Auto-Increment verwenden
+            // Wenn ein Artikel mit dieser ID gefunden wurde, neue ID ermitteln
             if ($checkSql->getRows() > 0) {
                 if ($debug) {
-                    echo '<pre>HINWEIS: Artikel mit ID ' . $articleData['id'] . ' existiert bereits. Verwende Auto-Increment.</pre>';
+                    echo '<pre>HINWEIS: Artikel mit ID ' . $articleData['id'] . ' existiert bereits. Ermittle neue ID.</pre>';
                 }
                 
-                // Neue ID generieren
+                // Die nächsthöhere verfügbare ID finden
                 $maxSql = rex_sql::factory();
                 $maxSql->setQuery("SELECT MAX(id) as max_id FROM " . $tableName);
-                $maxId = $maxSql->getValue('max_id');
+                $maxId = (int)$maxSql->getValue('max_id');
                 
-                // Neue ID festlegen (maximal vorhandene ID + 1)
-                $articleData['id'] = (int)$maxId + 1;
+                // Sicherstellen, dass die ID-Zuweisung eindeutig ist
+                $newId = $maxId + 1;
+                
+                // Überprüfen, ob die neue ID bereits existiert (zur Sicherheit)
+                $existsSql = rex_sql::factory();
+                while (true) {
+                    $existsSql->setQuery("SELECT id FROM " . $tableName . " WHERE id = :id LIMIT 1", 
+                        ['id' => $newId]);
+                    
+                    if ($existsSql->getRows() === 0) {
+                        // ID ist frei, wir können sie verwenden
+                        break;
+                    }
+                    
+                    // Nächste ID versuchen
+                    $newId++;
+                }
+                
+                // Neue ID festlegen
+                $articleData['id'] = $newId;
+                $idChanged = true;
                 
                 if ($debug) {
-                    echo '<pre>HINWEIS: Neue generierte ID: ' . $articleData['id'] . '</pre>';
+                    echo '<pre>HINWEIS: Neue generierte ID: ' . $newId . '</pre>';
                 }
             }
         }
@@ -106,17 +216,14 @@ function insertArticleDirectly($articleData) {
             // ID merken (nur beim ersten Einfügen)
             if ($insertedId === null) {
                 $insertedId = $articleData['id'];
-                if ($insertedId == 0) {
-                    $insertedId = $articleSql->getLastId();
-                }
             }
         }
         
-        // Erfolgreiche Eingabe
-        return [true, $insertedId];
+        // Erfolgreiche Eingabe mit Information, ob ID geändert wurde
+        return [true, $insertedId, "", $idChanged, $originalId];
     } catch (Exception $e) {
         rex_logger::logException($e);
-        return [false, null, $e->getMessage()];
+        return [false, null, $e->getMessage(), false, $originalId];
     }
 }
 
@@ -163,98 +270,83 @@ if ($func === 'restore' && $articleId > 0) {
             }
         }
         
-        $success = false;
-        $newArticleId = null;
-        
-        // Prüfen, ob an der Stelle der Original-ID bereits ein anderer Artikel existiert
-        $existingArticle = rex_article::get($original_id);
-        
-        if ($existingArticle) {
-            // Wir können den Artikel nicht unter seiner ursprünglichen ID wiederherstellen
-            // Also erstellen wir einen neuen mit Auto-Increment
+        // Artikel-Daten vorbereiten
+        $articleData = [
+            'id' => $original_id,
+            'parent_id' => $parent_id,
+            'name' => $name,
+            'catname' => $catname,
+            'startarticle' => $startarticle
+        ];
+
+        // Priorität ermitteln mit Überprüfung auf bereits vergebene Prioritäten
+        if ($startarticle) {
+            // Für Startartikel (Kategorien) die catpriority prüfen und ggf. anpassen
+            $savedPriority = ($catpriority > 0) ? $catpriority : 1;
+            $articleData['catpriority'] = getAvailablePriority($parent_id, $savedPriority, true);
             
-            // Artikel-Daten vorbereiten
-            $articleData = [
-                'id' => 0, // Auto-Increment verwenden
-                'parent_id' => $parent_id,
-                'name' => $name,
-                'catname' => $catname,
-                'catpriority' => $catpriority,
-                'priority' => $priority,
-                'path' => $path,
-                'status' => $status,
-                'template_id' => $template_id,
-                'startarticle' => $startarticle,
-                'createdate' => $createdate,
-                'createuser' => !empty($createuser) ? $createuser : rex::getUser()->getLogin(),
-                'updatedate' => date('Y-m-d H:i:s'),
-                'updateuser' => rex::getUser()->getLogin(),
-                'revision' => 0 // Auf Live-Version setzen
-            ];
-            
-            if ($debug) {
-                echo '<pre>Versuche neuen Artikel zu erstellen: ' . print_r($articleData, true) . '</pre>';
-            }
-            
-            // Direkte Einfügung in die Datenbank
-            list($success, $newArticleId, $errorMessage) = insertArticleDirectly($articleData);
-            
-            if (!$success) {
-                $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . $errorMessage);
-                if ($debug) {
-                    echo '<pre>FEHLER beim Erstellen des Artikels: ' . $errorMessage . '</pre>';
-                }
+            // Falls die Priorität angepasst wurde, eine Infomeldung vorbereiten
+            if ($articleData['catpriority'] != $savedPriority) {
+                $priorityChangedInfo = rex_view::info(
+                    'Die ursprüngliche Kategorie-Priorität ' . $savedPriority . 
+                    ' ist bereits vergeben. Die neue Priorität ist ' . $articleData['catpriority'] . '.'
+                );
             }
         } else {
-            // Der Original-Artikel existiert nicht mehr, wir können versuchen ihn mit der ursprünglichen ID wiederherzustellen
+            // Für normale Artikel die priority prüfen und ggf. anpassen
+            $savedPriority = ($priority > 0) ? $priority : 1;
+            $articleData['priority'] = getAvailablePriority($parent_id, $savedPriority, false);
             
-            // Artikel-Daten vorbereiten
-            $articleData = [
-                'id' => $original_id,
-                'parent_id' => $parent_id,
-                'name' => $name,
-                'catname' => $catname,
-                'catpriority' => $catpriority,
-                'priority' => $priority,
-                'path' => $path,
-                'status' => $status,
-                'template_id' => $template_id,
-                'startarticle' => $startarticle,
-                'createdate' => $createdate,
-                'createuser' => !empty($createuser) ? $createuser : rex::getUser()->getLogin(),
-                'updatedate' => date('Y-m-d H:i:s'),
-                'updateuser' => rex::getUser()->getLogin(),
-                'revision' => 0 // Auf Live-Version setzen
-            ];
-            
-            if ($debug) {
-                echo '<pre>Versuche Original-Artikel wiederherzustellen mit ID ' . $original_id . ': ' . print_r($articleData, true) . '</pre>';
-            }
-            
-            // Direkte Einfügung in die Datenbank
-            list($success, $newArticleId, $errorMessage) = insertArticleDirectly($articleData);
-            
-            if (!$success) {
-                $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . $errorMessage);
-                
-                if ($debug) {
-                    echo '<pre>FEHLER beim Wiederherstellen mit Original-ID: ' . $errorMessage . '</pre>';
-                }
-                
-                // Fallback: Versuchen, einen neuen Artikel mit Auto-Increment zu erstellen
-                $articleData['id'] = 0; // Auto-Increment verwenden
-                list($success, $newArticleId, $errorMessage) = insertArticleDirectly($articleData);
-                
-                if (!$success) {
-                    if ($debug) {
-                        echo '<pre>FEHLER beim Fallback: ' . $errorMessage . '</pre>';
-                    }
-                    $newArticleId = null;
-                    $message .= rex_view::error('Fallback-Versuch fehlgeschlagen: ' . $errorMessage);
-                }
+            // Falls die Priorität angepasst wurde, eine Infomeldung vorbereiten
+            if ($articleData['priority'] != $savedPriority) {
+                $priorityChangedInfo = rex_view::info(
+                    'Die ursprüngliche Artikel-Priorität ' . $savedPriority . 
+                    ' ist bereits vergeben. Die neue Priorität ist ' . $articleData['priority'] . '.'
+                );
             }
         }
-		if ($newArticleId) {
+
+        // Die restlichen Felder hinzufügen
+        $articleData['path'] = $path;
+        $articleData['status'] = $status;
+        $articleData['template_id'] = $template_id;
+        $articleData['createdate'] = $createdate;
+        $articleData['createuser'] = !empty($createuser) ? $createuser : rex::getUser()->getLogin();
+        $articleData['updatedate'] = date('Y-m-d H:i:s');
+        $articleData['updateuser'] = rex::getUser()->getLogin();
+        $articleData['revision'] = 0; // Auf Live-Version setzen
+        
+        if ($debug) {
+            echo '<pre>Versuche Artikel wiederherzustellen mit ID ' . $original_id . ': ' . print_r($articleData, true) . '</pre>';
+        }
+        
+        // Direkte Einfügung in die Datenbank
+        list($success, $newArticleId, $errorMessage, $idChanged, $originalRequestedId) = insertArticleDirectly($articleData);
+        
+        if (!$success) {
+            $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . $errorMessage);
+            
+            if ($debug) {
+                echo '<pre>FEHLER beim Wiederherstellen des Artikels: ' . $errorMessage . '</pre>';
+            }
+        } else {
+            // Prüfen, ob die ID geändert wurde
+            if ($idChanged) {
+                $message = rex_view::success(rex_i18n::msg('trash_article_restored'));
+                $message .= rex_view::info(rex_i18n::msg('trash_article_restored_with_new_id', $originalRequestedId, $newArticleId));
+            } else {
+                $message = rex_view::success(rex_i18n::msg('trash_article_restored'));
+            }
+            
+            // Falls vorhanden, die Info über geänderte Priorität anzeigen
+            if (isset($priorityChangedInfo)) {
+                $message .= $priorityChangedInfo;
+            }
+            
+            if (!$parentExists) {
+                $message .= rex_view::warning(rex_i18n::msg('trash_parent_category_missing'));
+            }
+            
             // Meta-Attribute wiederherstellen
             if ($metaAttributes) {
                 try {
@@ -339,6 +431,9 @@ if ($func === 'restore' && $articleId > 0) {
                 echo '<pre>Wiederherstellen von Slices für Artikel #' . $newArticleId . ' mit Sprachen: ' . implode(', ', array_keys($clangIds)) . ' und Revisionen: ' . implode(', ', $revisions) . '</pre>';
             }
             
+            // Zähler für wiederhergestellte Slices
+            $restoredSliceCount = 0;
+            
             foreach (array_keys($clangIds) as $clangId) {
                 foreach ($revisions as $revision) {
                     // Für jede Sprache und Revision die Slices wiederherstellen
@@ -368,10 +463,9 @@ if ($func === 'restore' && $articleId > 0) {
                                 }
                             }
                             
-                            // Erstelle einen SQL-Query für INSERT
-                            $query = "INSERT INTO " . rex::getTable('article_slice') . " SET ";
+                            // Wichtig: Hier die neue Artikel-ID verwenden!
                             $params = [
-                                'article_id' => $newArticleId,
+                                'article_id' => $newArticleId,  // Die neue ID des wiederhergestellten Artikels
                                 'clang_id' => $slice['clang_id'],
                                 'ctype_id' => $slice['ctype_id'] ?: 1,
                                 'module_id' => $slice['module_id'] ?: 0,
@@ -407,7 +501,9 @@ if ($func === 'restore' && $articleId > 0) {
                             }
                             
                             // SQL-Query aufbauen
+                            $query = "INSERT INTO " . rex::getTable('article_slice') . " SET ";
                             $first = true;
+                            
                             foreach ($params as $key => $value) {
                                 if (isset($sliceColumns[$key])) {
                                     if (!$first) {
@@ -426,6 +522,7 @@ if ($func === 'restore' && $articleId > 0) {
                             $sliceSql = rex_sql::factory();
                             if ($debug) $sliceSql->setDebug();
                             $sliceSql->setQuery($query, $params);
+                            $restoredSliceCount++;
                             
                             // Neue Slice-ID holen
                             $newSliceId = $sliceSql->getLastId();
@@ -515,20 +612,9 @@ if ($func === 'restore' && $articleId > 0) {
                 }
             }
             
-            // Erfolgsmeldung anzeigen
-            if (empty($message)) {
-                $message = rex_view::success(rex_i18n::msg('trash_article_restored'));
-            }
-            
-            if (!$parentExists) {
-                $message .= rex_view::warning(rex_i18n::msg('trash_parent_category_missing'));
-            }
-            if ($newArticleId != $original_id) {
-                $message .= rex_view::info(rex_i18n::msg('trash_article_restored_with_new_id', $original_id, $newArticleId));
-            }
-        } else {
-            if (empty($message)) {
-                $message = rex_view::error(rex_i18n::msg('trash_restore_error'));
+            // Bei Debug-Modus zusätzliche Info über wiederhergestellte Slices anzeigen
+            if ($debug) {
+                $message .= rex_view::info('Wiederhergestellte Slices: ' . $restoredSliceCount);
             }
         }
     } else {
@@ -600,6 +686,7 @@ if ($func === 'restore' && $articleId > 0) {
     }
 }
 
+
 // Ausgabe der Liste der Artikel im Papierkorb
 echo $message;
 
@@ -616,26 +703,72 @@ $sql = 'SELECT a.*,
 $list = rex_list::factory($sql);
 $list->addTableAttribute('class', 'table-striped');
 
-// Spalten definieren
+// Spalten definieren - nur die wichtigsten behalten
 $list->removeColumn('id');
 $list->removeColumn('meta_attributes');
+$list->removeColumn('path');
+$list->removeColumn('createdate');
+$list->removeColumn('updatedate');
+$list->removeColumn('createuser');
+$list->removeColumn('updateuser');
+$list->removeColumn('revision');
+$list->removeColumn('template_id');
+
+// Die Originalspalten behalten, aber ausblenden
+// - diese werden später referenziert
 $list->setColumnLabel('article_id', rex_i18n::msg('trash_original_id'));
 $list->setColumnLabel('name', rex_i18n::msg('trash_article_name'));
 $list->setColumnLabel('catname', rex_i18n::msg('trash_category_name'));
 $list->setColumnLabel('parent_id', rex_i18n::msg('trash_parent_id'));
 $list->setColumnLabel('languages', rex_i18n::msg('trash_languages'));
 $list->setColumnLabel('deleted_at', rex_i18n::msg('trash_deleted_at'));
-$list->setColumnLabel('startarticle', rex_i18n::msg('trash_is_startarticle'));
-$list->setColumnLabel('slice_count', rex_i18n::msg('trash_slice_count'));
 
-// Formatierungen
+// Eine einfachere Herangehensweise:
+// 1. Typ als normaler Text mit Symbolen
+$list->addColumn('typ', 'Artikeltyp', -1);
+$list->setColumnFormat('typ', 'custom', function ($params) {
+    $startArticle = $params['list']->getValue('startarticle');
+    $status = $params['list']->getValue('status');
+    
+    $type = $startArticle == 1 ? 'Kategorie' : 'Artikel';
+    $statusText = $status == 1 ? 'Online' : 'Offline';
+    
+    $icon = $startArticle == 1 ? 
+        '<i class="rex-icon rex-icon-category"></i>' : 
+        '<i class="rex-icon rex-icon-article"></i>';
+    
+    $statusIcon = $status == 1 ? 
+        '<span class="text-success"><i class="rex-icon rex-icon-online"></i></span>' : 
+        '<span class="text-danger"><i class="rex-icon rex-icon-offline"></i></span>';
+    
+    return $icon . ' ' . $statusIcon . '<br>' . $type . ' (' . $statusText . ')';
+});
+
+// 2. Infospalte mit Details
+$list->addColumn('details', 'Details', -1);
+$list->setColumnFormat('details', 'custom', function ($params) {
+    $startArticle = $params['list']->getValue('startarticle');
+    $output = [];
+    
+    // Priorität hinzufügen je nach Artikeltyp
+    if ($startArticle == 1) {
+        $output[] = 'Kat-Prio: ' . $params['list']->getValue('catpriority');
+    } else {
+        $output[] = 'Prio: ' . $params['list']->getValue('priority');
+    }
+    
+    // Template-ID hinzufügen
+    $output[] = 'Template: ' . $params['list']->getValue('template_id');
+    
+    // Weitere Infos
+    $output[] = 'Original-ID: ' . $params['list']->getValue('article_id');
+    $output[] = 'Slices: ' . $params['list']->getValue('slice_count');
+    
+    return implode('<br>', $output);
+});
+
+// Formatierungen für verbleibende Spalten
 $list->setColumnFormat('deleted_at', 'date', 'd.m.Y H:i');
-$list->setColumnFormat('startarticle', 'custom', function($params) {
-    return $params['value'] == 1 ? 'Ja' : 'Nein';
-});
-$list->setColumnFormat('status', 'custom', function($params) {
-    return $params['value'] == 1 ? 'Online' : 'Offline';
-});
 $list->setColumnFormat('languages', 'custom', function($params) {
     if (!$params['value']) {
         return rex_i18n::msg('trash_no_languages');
@@ -649,7 +782,15 @@ $list->setColumnFormat('languages', 'custom', function($params) {
     return implode(', ', $names);
 });
 
-// Aktionen definieren
+// Verstecke nicht benötigte Spalten
+$list->removeColumn('status');
+$list->removeColumn('startarticle');
+$list->removeColumn('slice_count');
+$list->removeColumn('article_id');
+$list->removeColumn('catpriority');
+$list->removeColumn('priority');
+
+// Aktionsspalten hinzufügen
 $list->addColumn('restore', '<i class="rex-icon rex-icon-refresh"></i> ' . rex_i18n::msg('trash_restore'));
 $list->setColumnParams('restore', ['func' => 'restore', 'id' => '###id###']);
 
