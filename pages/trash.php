@@ -359,6 +359,15 @@ if ($func === 'restore' && $articleId > 0) {
                         $existingColumns[$column['name']] = true;
                     }
                     
+                    $ignoreColumns = ['pid', 'id', /* weitere Auto-Increment oder Primary Key Spalten */];
+
+                    foreach ($metaAttributes as $key => $value) {
+                        // Nur vorhandene Spalten aktualisieren und zu ignorierende Spalten überspringen
+                        if (isset($existingColumns[$key]) && !in_array($key, $ignoreColumns)) {
+                            // Spalte zum Update hinzufügen
+                        }
+                    }
+                    
                     foreach (rex_clang::getAllIds() as $clangId) {
                         // Für jede Sprache die Meta-Attribute setzen
                         
