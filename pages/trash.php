@@ -347,72 +347,72 @@ if ($func === 'restore' && $articleId > 0) {
                 $message .= rex_view::warning(rex_i18n::msg('trash_parent_category_missing'));
             }
             
-            // Meta-Attribute wiederherstellen
-            if ($metaAttributes) {
-                try {
-                    // Spalteninformationen der Artikeltabelle abrufen
-                    $columnInfo = rex_sql::showColumns(rex::getTable('article'));
-                    $existingColumns = [];
-                    
-                    // Vorhandene Spalten in ein Array überführen für schnelleren Zugriff
-                    foreach ($columnInfo as $column) {
-                        $existingColumns[$column['name']] = true;
+// Meta-Attribute wiederherstellen, falls vorhanden
+if ($metaAttributes) {
+    try {
+        // Spalteninformationen der Artikeltabelle abrufen
+        $columnInfo = rex_sql::showColumns(rex::getTable('article'));
+        $existingColumns = [];
+        $primaryKeys = [];
+        
+        // Vorhandene Spalten in ein Array überführen für schnelleren Zugriff
+        // und Primary Keys identifizieren
+        foreach ($columnInfo as $column) {
+            $existingColumns[$column['name']] = true;
+            if ($column['key'] === 'PRI' || $column['extra'] === 'auto_increment') {
+                $primaryKeys[$column['name']] = true;
+            }
+        }
+        
+        // Liste von Spalten, die immer ignoriert werden sollten
+        $ignoreColumns = ['pid', 'id', 'article_id'];
+        
+        foreach (rex_clang::getAllIds() as $clangId) {
+            // Für jede Sprache die Meta-Attribute setzen
+            
+            // Query manuell aufbauen für mehr Kontrolle
+            $query = "UPDATE " . rex::getTable('article') . " SET ";
+            $params = [];
+            $hasValues = false;
+            $first = true;
+            
+            foreach ($metaAttributes as $key => $value) {
+                // Prüfen ob die Spalte existiert und kein Primary Key oder Auto-Increment-Feld ist
+                if (isset($existingColumns[$key]) && !isset($primaryKeys[$key]) && !in_array($key, $ignoreColumns)) {
+                    if (!$first) {
+                        $query .= ", ";
                     }
-                    
-                    $ignoreColumns = ['pid', 'id', /* weitere Auto-Increment oder Primary Key Spalten */];
-
-                    foreach ($metaAttributes as $key => $value) {
-                        // Nur vorhandene Spalten aktualisieren und zu ignorierende Spalten überspringen
-                        if (isset($existingColumns[$key]) && !in_array($key, $ignoreColumns)) {
-                            // Spalte zum Update hinzufügen
-                        }
-                    }
-                    
-                    foreach (rex_clang::getAllIds() as $clangId) {
-                        // Für jede Sprache die Meta-Attribute setzen
-                        
-                        // Query manuell aufbauen für mehr Kontrolle
-                        $query = "UPDATE " . rex::getTable('article') . " SET ";
-                        $params = [];
-                        $hasValues = false;
-                        $first = true;
-                        
-                        foreach ($metaAttributes as $key => $value) {
-                            // Prüfen ob die Spalte existiert (AddOn könnte deinstalliert worden sein)
-                            if (isset($existingColumns[$key])) {
-                                if (!$first) {
-                                    $query .= ", ";
-                                }
-                                $query .= "`" . $key . "` = :" . $key;
-                                $params[$key] = $value;
-                                $hasValues = true;
-                                $first = false;
-                            }
-                        }
-                        
-                        if ($hasValues) {
-                            $query .= " WHERE id = :id AND clang_id = :clang_id";
-                            $params['id'] = $newArticleId;
-                            $params['clang_id'] = $clangId;
-                            
-                            if ($debug) {
-                                echo '<pre>Meta-Update Query: ' . $query . '</pre>';
-                                echo '<pre>Meta-Update Params: ' . print_r($params, true) . '</pre>';
-                            }
-                            
-                            $metaSql = rex_sql::factory();
-                            if ($debug) $metaSql->setDebug();
-                            $metaSql->setQuery($query, $params);
-                        }
-                    }
-                } catch (Exception $e) {
-                    // Fehler beim Wiederherstellen der Meta-Attribute loggen, aber den Prozess fortsetzen
-                    rex_logger::logException($e);
-                    if ($debug) {
-                        echo '<pre>FEHLER beim Setzen der Meta-Attribute: ' . $e->getMessage() . '</pre>';
-                    }
+                    $query .= "`" . $key . "` = :" . $key;
+                    $params[$key] = $value;
+                    $hasValues = true;
+                    $first = false;
                 }
             }
+            
+            if ($hasValues) {
+                $query .= " WHERE id = :id AND clang_id = :clang_id";
+                $params['id'] = $newArticleId;
+                $params['clang_id'] = $clangId;
+                
+                if ($debug) {
+                    echo '<pre>Meta-Update Query: ' . $query . '</pre>';
+                    echo '<pre>Meta-Update Params: ' . print_r($params, true) . '</pre>';
+                }
+                
+                $metaSql = rex_sql::factory();
+                if ($debug) $metaSql->setDebug();
+                $metaSql->setQuery($query, $params);
+            }
+        }
+    } catch (Exception $e) {
+        // Fehler beim Wiederherstellen der Meta-Attribute loggen, aber den Prozess fortsetzen
+        rex_logger::logException($e);
+        if ($debug) {
+            echo '<pre>FEHLER beim Setzen der Meta-Attribute: ' . $e->getMessage() . '</pre>';
+        }
+    }
+}
+
             
             // Jetzt die Slices wiederherstellen, gruppiert nach Sprache und Revision
             $slicesSql = rex_sql::factory();
