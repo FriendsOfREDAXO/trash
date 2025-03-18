@@ -7,7 +7,14 @@ rex_sql_table::get(rex::getTable('trash_article'))
     ->ensureColumn(new rex_sql_column('name', 'varchar(255)'))
     ->ensureColumn(new rex_sql_column('catname', 'varchar(255)'))
     ->ensureColumn(new rex_sql_column('catpriority', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('attributes', 'text'))
+    ->ensureColumn(new rex_sql_column('path', 'varchar(255)'))  // Neue Spalte statt in attributes
+    ->ensureColumn(new rex_sql_column('priority', 'int(10) unsigned'))  // Neue Spalte statt in attributes
+    ->ensureColumn(new rex_sql_column('template_id', 'int(10) unsigned'))  // Neue Spalte statt in attributes
+    ->ensureColumn(new rex_sql_column('createdate', 'datetime'))  // Neue Spalte statt in attributes
+    ->ensureColumn(new rex_sql_column('createuser', 'varchar(255)'))  // Neue Spalte statt in attributes
+    ->ensureColumn(new rex_sql_column('updatedate', 'datetime'))  // Neue Spalte statt in attributes
+    ->ensureColumn(new rex_sql_column('updateuser', 'varchar(255)'))  // Neue Spalte statt in attributes
+    ->ensureColumn(new rex_sql_column('revision', 'int(10) unsigned', false, '0'))  // Neue Spalte statt in attributes
     ->ensureColumn(new rex_sql_column('meta_attributes', 'longtext'))
     ->ensureColumn(new rex_sql_column('status', 'tinyint(1)'))
     ->ensureColumn(new rex_sql_column('startarticle', 'tinyint(1)', false, '0'))
