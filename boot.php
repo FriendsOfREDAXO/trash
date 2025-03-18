@@ -14,11 +14,17 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
     $name = $ep->getParam('name');
     $status = $ep->getParam('status');
     
+    // Wenn keine Sprachvariable übergeben wurde, versuchen wir die aktuelle Sprache zu verwenden
+    if (!$clangId) {
+        $clangId = rex_clang::getCurrentId();
+        rex_logger::factory()->info('Trash: Fehlende Sprachvariable für Artikel ' . $articleId . ', verwende aktuelle Sprache: ' . $clangId);
+    }
+    
     // Prüfen, ob wir genügend Daten haben, um fortzufahren
-    if (!$articleId || !$clangId) {
+    if (!$articleId) {
         rex_logger::logError(
             E_WARNING,
-            'Trash: Unzureichende Daten für Artikel-Backup, ID: ' . $articleId . ', Sprache: ' . $clangId,
+            'Trash: Unzureichende Daten für Artikel-Backup, ID fehlt',
             __FILE__,
             __LINE__
         );
