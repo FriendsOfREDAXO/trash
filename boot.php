@@ -5,6 +5,22 @@
  * @package redaxo\trash
  */
 
+// Hilfsfunktion für die Datumskonvertierung
+function fixDateFormat($dateStr) {
+    // Wenn es ein Timestamp ist (numerisch), konvertieren
+    if (is_numeric($dateStr)) {
+        return date('Y-m-d H:i:s', (int)$dateStr);
+    }
+    
+    // Wenn es ein leerer String oder NULL ist, aktuelles Datum zurückgeben
+    if (empty($dateStr) || $dateStr === '0000-00-00 00:00:00') {
+        return date('Y-m-d H:i:s');
+    }
+    
+    // Sonst wie erhalten zurückgeben
+    return $dateStr;
+}
+
 // Extension Point für das Löschen von Artikeln
 rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
     // Artikel-Daten aus dem Extension Point holen
@@ -38,19 +54,23 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
             $sql->setValue('startarticle', $article->isStartArticle() ? 1 : 0);
             $sql->setValue('deleted_at', date('Y-m-d H:i:s'));
             
-            // Weitere wichtige Daten speichern
-            $attributes = json_encode([
-                'path' => $article->getValue('path'),
-                'priority' => $article->getValue('priority'),
-                'template_id' => $article->getValue('template_id'),
-                'createdate' => $article->getValue('createdate'),
-                'createuser' => $article->getValue('createuser'),
-                'updatedate' => $article->getValue('updatedate'),
-                'updateuser' => $article->getValue('updateuser'),
-                // Füge die Revision hinzu, wenn vorhanden
-                'revision' => $article->hasValue('revision') ? $article->getValue('revision') : 0
-            ]);
-            $sql->setValue('attributes', $attributes);
+            // Direkte Speicherung der Attribute als eigene Spalten mit Datumsfixierung
+            $sql->setValue('path', $article->getValue('path'));
+            $sql->setValue('priority', $article->getValue('priority'));
+            $sql->setValue('template_id', $article->getValue('template_id'));
+            
+            // Hier die Datumswerte korrekt formatieren
+            $sql->setValue('createdate', fixDateFormat($article->getValue('createdate')));
+            $sql->setValue('createuser', $article->getValue('createuser'));
+            $sql->setValue('updatedate', fixDateFormat($article->getValue('updatedate')));
+            $sql->setValue('updateuser', $article->getValue('updateuser'));
+            
+            // Revision-Wert speichern, wenn vorhanden
+            if ($article->hasValue('revision')) {
+                $sql->setValue('revision', $article->getValue('revision'));
+            } else {
+                $sql->setValue('revision', 0);
+            }
             
             // Meta-Attribute als JSON speichern
             $metaAttributes = collectMetaAttributes('article', $article);
