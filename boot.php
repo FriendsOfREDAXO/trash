@@ -36,6 +36,37 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
     $trashSliceTable = rex::getTable('trash_article_slice');
     $trashSliceMetaTable = rex::getTable('trash_slice_meta');
     
+    // Überprüfen, ob Tabellennamen korrekt definiert sind
+    if (empty($trashTable) || empty($trashSliceTable) || empty($trashSliceMetaTable)) {
+        rex_logger::logError(
+            E_WARNING,
+            'Trash: Tabellennamen nicht korrekt definiert: trash_article=' . $trashTable . 
+            ', trash_article_slice=' . $trashSliceTable . 
+            ', trash_slice_meta=' . $trashSliceMetaTable,
+            __FILE__,
+            __LINE__
+        );
+        return;
+    }
+    
+    // Versuchen, die Existenz der Tabellen zu überprüfen
+    try {
+        $checkSql = rex_sql::factory();
+        $checkSql->setQuery('SHOW TABLES LIKE :table', ['table' => $trashTable]);
+        if ($checkSql->getRows() === 0) {
+            rex_logger::logError(
+                E_WARNING,
+                'Trash: Tabelle ' . $trashTable . ' existiert nicht',
+                __FILE__,
+                __LINE__
+            );
+            return;
+        }
+    } catch (Exception $e) {
+        rex_logger::logException($e);
+        return;
+    }
+    
     // Aktuelle Zeit in korrekt formatiertem Format
     $currentTimestamp = date('Y-m-d H:i:s');
     
@@ -96,6 +127,10 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
         
         // Artikel in Papierkorb verschieben
         $sql = rex_sql::factory();
+        
+        // Debug-Log für den Tabellennamen
+        rex_logger::factory()->info('Trash: Setze Tabellennamen für Artikel-Insert: ' . $trashTable);
+        
         $sql->setTable($trashTable);
         $sql->setValue('article_id', $articleId);
         $sql->setValue('parent_id', $parentId);
@@ -149,8 +184,8 @@ rex_extension::register('ART_PRE_DELETED', function(rex_extension_point $ep) {
                 try {
                     $slices = rex_sql::factory();
                     $slices->setQuery('SELECT * FROM ' . rex::getTable('article_slice') . ' 
-                                       WHERE article_id = :id AND clang_id = :clang AND revision = :revision', 
-                                      ['id' => $articleId, 'clang' => $langId, 'revision' => $revision]);
+                                    WHERE article_id = :id AND clang_id = :clang AND revision = :revision', 
+                                    ['id' => $articleId, 'clang' => $langId, 'revision' => $revision]);
                     
                     // Slices in den Papierkorb kopieren
                     if ($slices->getRows() > 0) {
@@ -201,8 +236,24 @@ function formatDateIfNeeded($date) {
  */
 function backupSlice($slice, $trashArticleId, $trashSliceTable, $trashSliceMetaTable) {
     try {
+        // Überprüfen, ob Tabellennamen korrekt definiert sind
+        if (empty($trashSliceTable) || empty($trashSliceMetaTable)) {
+            throw new Exception('Trash: Tabellennamen nicht korrekt definiert');
+        }
+        
         $sliceSql = rex_sql::factory();
-        $sliceSql->setTable($trashSliceTable);
+        
+        // Überprüfen, ob die Tabelle existiert, bevor wir versuchen, sie zu verwenden
+        $sliceSql->setQuery('SHOW TABLES LIKE :table', ['table' => $trashSliceTable]);
+        if ($sliceSql->getRows() === 0) {
+            throw new Exception('Trash: Tabelle ' . $trashSliceTable . ' existiert nicht');
+        }
+        
+        // Explizit den Tabellennamen setzen und überprüfen
+        $sliceSql = rex_sql::factory();
+        $tableName = $trashSliceTable;
+        rex_logger::factory()->info('Trash: Setze Tabellennamen: ' . $tableName);
+        $sliceSql->setTable($tableName);
         
         // Minimal erforderliche Felder setzen
         $sliceSql->setValue('trash_article_id', $trashArticleId);
@@ -246,7 +297,15 @@ function backupSlice($slice, $trashArticleId, $trashSliceTable, $trashSliceMetaT
         $sliceMetaAttributes = collectMetaAttributes('article_slice', $slice, $fieldTypes);
         
         // Meta-Attribute speichern, wenn vorhanden
-        if (!empty($sliceMetaAttributes)) {
+        if (!empty($sliceMetaAttributes) && !empty($trashSliceMetaTable)) {
+            $metaSql = rex_sql::factory();
+            
+            // Überprüfen, ob die Meta-Tabelle existiert
+            $metaSql->setQuery('SHOW TABLES LIKE :table', ['table' => $trashSliceMetaTable]);
+            if ($metaSql->getRows() === 0) {
+                throw new Exception('Trash: Tabelle ' . $trashSliceMetaTable . ' existiert nicht');
+            }
+            
             $metaSql = rex_sql::factory();
             $metaSql->setTable($trashSliceMetaTable);
             $metaSql->setValue('trash_slice_id', $sliceId);
