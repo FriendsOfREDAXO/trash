@@ -131,30 +131,18 @@ Ein Cronjob kann konfiguriert werden, um den Papierkorb automatisch zu bereinige
    - SEO-/YRewrite-Daten werden erhalten
    - Dynamisch hinzugefügte Felder werden erkannt und gesichert
 
-### Anpassbarkeit für Entwickler
+## Autor
 
-Um den Papierkorb mit eigenen AddOns zu integrieren:
+**Friends Of REDAXO**
 
-1. **Eigene Metadaten sichern**
-   - Achten Sie darauf, dass Ihre benutzerdefinierten Felder in der Artikel-Tabelle erkannt werden
-   - Namen der Felder sollten eindeutig sein
-   - Komplexe Datenstrukturen werden automatisch als JSON serialisiert
+* http://www.redaxo.org
+* https://github.com/FriendsOfREDAXO
 
-2. **Erweiterungsmöglichkeiten**
-   - Extension Points könnten hinzugefügt werden (in zukünftigen Versionen)
-   - Die Tabellen können als Basis für eigene "Undo"-Funktionalitäten dienen
-   - Weitere Inhaltstypen (Media, etc.) könnten über die gleiche Architektur gesichert werden
+**Projektleitung**
 
-## Wer hat's gemacht?
-
-**Thomas Skerbis** 
-
-*Problem? Idee? Fehler gefunden?* Schreib's auf GitHub oder schick 'ne Flaschenpost!
+[Thomas Skerbis](https://github.com/skerbis)
 
 ## Lizenz 
 
 MIT - Nimm's, nutz's, mach was draus!
 
----
-
-**Merke:** Löschen ist sowas von gestern - mit Trash hast du immer einen Plan B! 🚀
