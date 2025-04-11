@@ -627,8 +627,6 @@ if ($metaAttributes) {
                 }
             }
             
-            // Gesamtartikelcache löschen, um sicherzustellen, dass alle Menüs korrekt neu generiert werden
-            rex_article_cache::delete();
             
             // Wenn das Versions-Plugin vorhanden ist, Content generieren für beide Revisionen
             if (rex_plugin::get('structure', 'version')->isAvailable()) {
