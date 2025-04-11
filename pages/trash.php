@@ -626,7 +626,7 @@ if ($metaAttributes) {
                     }
                 }
             }
-            
+            rex_delete_cache();
             
             // Wenn das Versions-Plugin vorhanden ist, Content generieren für beide Revisionen
             if (rex_plugin::get('structure', 'version')->isAvailable()) {
