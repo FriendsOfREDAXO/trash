@@ -609,6 +609,27 @@ if ($metaAttributes) {
             // Cache löschen und neu generieren
             rex_article_cache::delete($newArticleId);
             
+            // Zusätzlich den Cache der übergeordneten Kategorie löschen, falls vorhanden
+            if ($parent_id > 0) {
+                rex_article_cache::delete($parent_id);
+                
+                // Wenn wir einen Startartikel wiederherstellen (Kategorie), 
+                // müssen wir auch den Cache für alle untergeordneten Artikel löschen
+                if ($startarticle == 1) {
+                    // Alle Artikel finden, die in dieser Kategorie sind
+                    $childArticles = rex_sql::factory();
+                    $childArticles->setQuery('SELECT id FROM ' . rex::getTable('article') . ' WHERE parent_id = :id', 
+                                            ['id' => $newArticleId]);
+                    
+                    foreach ($childArticles as $childArticle) {
+                        rex_article_cache::delete($childArticle->getValue('id'));
+                    }
+                }
+            }
+            
+            // Gesamtartikelcache löschen, um sicherzustellen, dass alle Menüs korrekt neu generiert werden
+            rex_article_cache::deleteCache();
+            
             // Wenn das Versions-Plugin vorhanden ist, Content generieren für beide Revisionen
             if (rex_plugin::get('structure', 'version')->isAvailable()) {
                 foreach (array_keys($clangIds) as $clangId) {
@@ -628,7 +649,7 @@ if ($metaAttributes) {
         }
     } else {
         $message = rex_view::error(rex_i18n::msg('trash_article_not_found'));
-    }
+        }
 } elseif ($func === 'delete' && $articleId > 0) {
     // Artikel endgültig löschen
     
