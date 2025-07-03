@@ -5,6 +5,8 @@
  * @package redaxo\trash
  */
 
+use FriendsOfREDAXO\trash\TrashService;
+
 // Rechteprüfung
 if (!rex::getUser()->isAdmin()) {
     // Nur Admins dürfen auf den Papierkorb zugreifen
@@ -12,220 +14,24 @@ if (!rex::getUser()->isAdmin()) {
     return;
 }
 
+// TrashService initialisieren
+$trashService = new TrashService();
+
 // Durchführung von Aktionen (Wiederherstellen oder Endgültig löschen)
 $func = rex_request('func', 'string');
 $articleId = rex_request('id', 'int');
 
-// Tabellennamen definieren für gelöschte Artikel
-$trashTable = rex::getTable('trash_article');
-$trashSliceTable = rex::getTable('trash_article_slice');
-$trashSliceMetaTable = rex::getTable('trash_slice_meta');
+// Tabellennamen für Anzeige
+$tables = $trashService->getTableNames();
+$trashTable = $tables['trash_article'];
+$trashSliceTable = $tables['trash_slice'];
+$trashSliceMetaTable = $tables['trash_slice_meta'];
 
 // Meldungen initialisieren
 $message = '';
 
 // Debug-Modus zum Anzeigen detaillierter Fehlermeldungen
 $debug = false; // Auf true setzen für Entwicklungszwecke
-
-
-/**
- * Prüft, ob eine Priorität in einer Kategorie bereits vergeben ist
- * 
- * @param int $parentId ID der Elternkategorie
- * @param int $priority Die zu prüfende Priorität
- * @param bool $isStartarticle Ob es sich um eine Kategorie handelt
- * @return bool True wenn die Priorität bereits vergeben ist, sonst false
- */
-function isPriorityTaken($parentId, $priority, $isStartarticle = false) {
-    $sql = rex_sql::factory();
-    
-    if ($isStartarticle) {
-        // Für Kategorien: catpriority prüfen
-        $query = 'SELECT id FROM ' . rex::getTablePrefix() . 'article 
-                 WHERE parent_id = :parent_id AND startarticle = 1 AND catpriority = :priority LIMIT 1';
-    } else {
-        // Für Artikel: priority prüfen
-        $query = 'SELECT id FROM ' . rex::getTablePrefix() . 'article 
-                 WHERE parent_id = :parent_id AND startarticle = 0 AND priority = :priority LIMIT 1';
-    }
-    
-    $sql->setQuery($query, [
-        'parent_id' => $parentId,
-        'priority' => $priority
-    ]);
-    
-    return $sql->getRows() > 0;
-}
-
-/**
- * Ermittelt eine verfügbare Priorität für den Artikel
- * Versucht zuerst die gewünschte Priorität zu verwenden, 
- * falls diese bereits belegt ist, wird die nächste freie Priorität verwendet
- * 
- * @param int $parentId ID der Elternkategorie
- * @param int $desiredPriority Die gewünschte Priorität
- * @param bool $isStartarticle Ob es sich um eine Kategorie handelt
- * @return int Eine verfügbare Priorität
- */
-function getAvailablePriority($parentId, $desiredPriority, $isStartarticle = false) {
-    // Wenn die gewünschte Priorität nicht belegt ist, kann sie verwendet werden
-    if (!isPriorityTaken($parentId, $desiredPriority, $isStartarticle)) {
-        return $desiredPriority;
-    }
-    
-    // Sonst die nächsthöchste freie Priorität finden
-    $priority = $desiredPriority;
-    while (isPriorityTaken($parentId, $priority, $isStartarticle)) {
-        $priority++;
-    }
-    
-    return $priority;
-}
-
-/**
- * Ermittelt die nächste verfügbare Priorität für einen Artikel in seiner Kategorie
- * 
- * @param int $parentId Die ID der Eltern-Kategorie
- * @param bool $isStartarticle Ob es sich um einen Startartikel handelt
- * @return int Die nächste verfügbare Priorität
- */
-function getNextPriority($parentId, $isStartarticle = false) {
-    $sql = rex_sql::factory();
-    
-    if ($isStartarticle) {
-        // Bei Startartikeln (Kategorien) maximale catpriority + 1 in der Elternkategorie verwenden
-        $sql->setQuery('SELECT MAX(catpriority) as max_prio FROM ' . rex::getTablePrefix() . 'article 
-                      WHERE parent_id = :parent_id AND startarticle = 1', 
-                      ['parent_id' => $parentId]);
-        
-        if ($sql->getRows() > 0 && $sql->getValue('max_prio') !== null) {
-            return (int)$sql->getValue('max_prio') + 1;
-        }
-        
-        return 1; // Fallback: erste Position
-    } else {
-        // Bei normalen Artikeln maximale priority + 1 in der Kategorie verwenden
-        $sql->setQuery('SELECT MAX(priority) as max_prio FROM ' . rex::getTablePrefix() . 'article 
-                      WHERE parent_id = :parent_id AND startarticle = 0', 
-                      ['parent_id' => $parentId]);
-        
-        if ($sql->getRows() > 0 && $sql->getValue('max_prio') !== null) {
-            return (int)$sql->getValue('max_prio') + 1;
-        }
-        
-        return 1; // Fallback: erste Position
-    }
-}
-
-/**
- * Direkte Artikel-Einfügung mit verbesserter ID- und Prioritätsbehandlung für REDAXO
- * 
- * @param array $articleData Die Daten für den Artikel
- * @return array [success, articleId, errorMessage, idChanged, originalRequestedId]
- */
-function insertArticleDirectly($articleData) {
-    global $debug;
-    
-    try {
-        // Tabellennamen direkt verwenden statt getTable() aufzurufen
-        $tableName = rex::getTablePrefix() . 'article';
-        if (empty($tableName)) {
-            return [false, null, "Tabellenname ist leer.", false, 0];
-        }
-        
-        $idChanged = false;
-        $originalId = $articleData['id'];
-        
-        // Prüfen, ob mit der angegebenen ID bereits ein Artikel existiert
-        if (isset($articleData['id']) && $articleData['id'] > 0) {
-            $checkSql = rex_sql::factory();
-            $checkSql->setQuery("SELECT id FROM " . $tableName . " WHERE id = :id LIMIT 1", 
-                ['id' => $articleData['id']]);
-            
-            // Wenn ein Artikel mit dieser ID gefunden wurde, neue ID ermitteln
-            if ($checkSql->getRows() > 0) {
-                if ($debug) {
-                    echo '<pre>HINWEIS: Artikel mit ID ' . $articleData['id'] . ' existiert bereits. Ermittle neue ID.</pre>';
-                }
-                
-                // Die nächsthöhere verfügbare ID finden
-                $maxSql = rex_sql::factory();
-                $maxSql->setQuery("SELECT MAX(id) as max_id FROM " . $tableName);
-                $maxId = (int)$maxSql->getValue('max_id');
-                
-                // Sicherstellen, dass die ID-Zuweisung eindeutig ist
-                $newId = $maxId + 1;
-                
-                // Überprüfen, ob die neue ID bereits existiert (zur Sicherheit)
-                $existsSql = rex_sql::factory();
-                while (true) {
-                    $existsSql->setQuery("SELECT id FROM " . $tableName . " WHERE id = :id LIMIT 1", 
-                        ['id' => $newId]);
-                    
-                    if ($existsSql->getRows() === 0) {
-                        // ID ist frei, wir können sie verwenden
-                        break;
-                    }
-                    
-                    // Nächste ID versuchen
-                    $newId++;
-                }
-                
-                // Neue ID festlegen
-                $articleData['id'] = $newId;
-                $idChanged = true;
-                
-                if ($debug) {
-                    echo '<pre>HINWEIS: Neue generierte ID: ' . $newId . '</pre>';
-                }
-            }
-        }
-        
-        // Für jede Sprache einen Eintrag erstellen
-        $insertedId = null;
-        foreach (rex_clang::getAllIds() as $clangId) {
-            // Zur Sicherheit den Query manuell aufbauen und prüfen
-            $query = "INSERT INTO " . $tableName . " SET ";
-            $params = [];
-            $first = true;
-            
-            // Alle Felder durchgehen
-            foreach ($articleData as $key => $value) {
-                if ($key != 'clang_id') { // clang_id nicht doppelt setzen
-                    if (!$first) {
-                        $query .= ", ";
-                    }
-                    $query .= "`" . $key . "` = :" . $key;
-                    $params[$key] = $value;
-                    $first = false;
-                }
-            }
-            
-            // clang_id hinzufügen
-            if (!$first) {
-                $query .= ", ";
-            }
-            $query .= "`clang_id` = :clang_id";
-            $params['clang_id'] = $clangId;
-            
-            // SQL ausführen
-            $articleSql = rex_sql::factory();
-            if ($debug) $articleSql->setDebug();
-            $articleSql->setQuery($query, $params);
-            
-            // ID merken (nur beim ersten Einfügen)
-            if ($insertedId === null) {
-                $insertedId = $articleData['id'];
-            }
-        }
-        
-        // Erfolgreiche Eingabe mit Information, ob ID geändert wurde
-        return [true, $insertedId, "", $idChanged, $originalId];
-    } catch (Exception $e) {
-        rex_logger::logException($e);
-        return [false, null, $e->getMessage(), false, $originalId];
-    }
-}
 
 // Aktionen verarbeiten
 if ($func === 'restore' && $articleId > 0) {
