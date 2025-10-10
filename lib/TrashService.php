@@ -308,6 +308,7 @@ class TrashService
                 $sql->setValue('catname', $article->getValue('catname'));
                 $sql->setValue('status', $status);
                 $sql->setValue('deleted_at', date('Y-m-d H:i:s'));
+                $sql->setValue('deleted_by', rex::getUser()->getLogin());
                 
                 // Check if it's a category
                 if ($article->getValue('startarticle') == 1) {
