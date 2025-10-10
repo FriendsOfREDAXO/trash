@@ -123,6 +123,7 @@ $list->setColumnLabel('catname', rex_i18n::msg('trash_category_name'));
 $list->setColumnLabel('parent_id', rex_i18n::msg('trash_parent_id'));
 $list->setColumnLabel('languages', rex_i18n::msg('trash_languages'));
 $list->setColumnLabel('deleted_at', rex_i18n::msg('trash_deleted_at'));
+$list->setColumnLabel('deleted_by', rex_i18n::msg('trash_deleted_by'));
 
 // Eine einfachere Herangehensweise:
 // 1. Typ als normaler Text mit Symbolen
