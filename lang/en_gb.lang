@@ -19,6 +19,7 @@ trash_category_name = Category
 trash_parent_id = Parent ID
 trash_languages = Languages
 trash_deleted_at = Deleted on
+trash_deleted_by = Deleted by
 trash_is_startarticle = Start article
 trash_slice_count = Number of slices
 trash_no_languages = None

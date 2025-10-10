@@ -19,6 +19,7 @@ rex_sql_table::get(rex::getTable('trash_article'))
     ->ensureColumn(new rex_sql_column('status', 'tinyint(1)'))
     ->ensureColumn(new rex_sql_column('startarticle', 'tinyint(1)', false, '0'))
     ->ensureColumn(new rex_sql_column('deleted_at', 'datetime'))
+    ->ensureColumn(new rex_sql_column('deleted_by', 'varchar(255)'))
     ->ensure();
 
 rex_sql_table::get(rex::getTable('trash_article_slice'))
