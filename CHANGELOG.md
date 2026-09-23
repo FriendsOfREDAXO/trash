@@ -22,6 +22,8 @@ Trash bekommt das Sofort-Rückgängig: direkt nach dem Löschen ein Hinweis mit 
 
 #### Changed (Geändert)
 
+- **Übersichtlichere Papierkorb-Liste.** Statt technischer Spalten (Eltern-ID, Template-ID, Priorität, Original-ID als eigene Spalten) zeigt die Liste jetzt ein Symbol für Artikel/Kategorie samt Online-Status, den Namen mit einer Zusatzzeile („Artikel · 12 Blöcke · Originale ID 42") sowie Löschzeitpunkt, Urheber und Sprachen. Ein einleitender Satz erklärt, was der Papierkorb tut; „Papierkorb leeren" erscheint nur, wenn etwas drin ist.
+- **Spalte „Sprachen" umbenannt in „Inhalte in".** Sie zeigte nie, in welcher Sprache gelöscht wurde – gelöscht wird immer in allen –, sondern in welchen Sprachen Inhalte gesichert wurden. Bei Kategorien steht dort jetzt „ohne Inhalte" statt eines irreführenden „Keine".
 - **Konflikt zum AddOn `undo`**: Beide gleichzeitig würden jede Löschung doppelt sichern und zwei konkurrierende Wiederherstellungswege anbieten. `package.yml` enthält deshalb einen `conflicts`-Block; REDAXO verhindert die Installation mit einer klaren Meldung. Wer nur das Sofort-Rückgängig braucht, installiert weiterhin `undo` – es bleibt eigenständig.
 - **Übernahme vorhandener undo-Daten**: Beim Update werden Einträge aus `rex_article_undo` samt zugehöriger Slices in den Papierkorb überführt, sofern die Tabellen noch existieren.
 - `update.php` pflegt die Tabellenstruktur nicht mehr als zweite Kopie, sondern bindet `install.php` ein (alle Definitionen sind idempotent). Das beseitigt die bisherige Doppelpflege.
@@ -34,6 +36,10 @@ Trash bekommt das Sofort-Rückgängig: direkt nach dem Löschen ein Hinweis mit 
 
 ### 🐛 Bug Fixes (Fehlerbehebungen)
 
+- **Gelöschte Kategorien landeten unter Umständen nicht im Papierkorb.** Die Prüfung gegen Mehrfacheinträge (der Extension Point feuert je Sprache) verglich nur die Artikel-ID. REDAXO vergibt gelöschte IDs aber neu – ein später gelöschter Artikel oder eine Kategorie mit derselben ID galt dadurch als „schon vorhanden" und wurde stillschweigend übergangen. Die Prüfung ist jetzt zusätzlich auf den laufenden Löschvorgang begrenzt.
+- **Kategorie-Hinweis erschien nicht.** `rex_api_category_delete` verpackt die Meldung in ein `rex_api_result` und gibt sie escaped aus – der Rückgabewert von `CAT_DELETED` erreichte die Seite nie als HTML. Der Hinweis wird jetzt vorgemerkt und über `PAGE_TITLE_SHOWN` ausgegeben.
+- **Doppelte Hinweise vermieden.** `ART_DELETED` und `CAT_DELETED` feuern je Sprache; der Toast erschien dadurch mehrfach. Er wird jetzt nur einmal je Seitenaufruf ausgegeben.
+- Die Typ-Erkennung im Hinweis wertete `status` (den Online-Status) als Kennzeichen für „ist Kategorie" aus. Da `ART_DELETED` ausschließlich für Artikel und `CAT_DELETED` für Kategorien feuert, steht der Typ längst durch den Extension Point fest.
 - **Fatal Error ohne angemeldeten Benutzer behoben**: `rex::getUser()->getLogin()` wurde an drei Stellen ungeprüft aufgerufen. Wird ein Artikel ohne Backend-Session gelöscht (Cronjob, Konsole, API), lieferte `getUser()` `null` und der Aufruf brach ab. Der Login wird jetzt über einen Helfer ermittelt, der in diesem Fall einen leeren String liefert. Dasselbe galt für die Rechteprüfung auf der Papierkorb-Seite.
 - Ein toter `$debug`-Zweig auf der Papierkorb-Seite (fest auf `false`) wurde entfernt; die Fehlermeldung steht ohnehin schon in der regulären Ausgabe und wird jetzt escaped.
 - **Irreführende Countdown-Meldung korrigiert.** „Möglich noch 30 Sekunden" las sich, als sei danach alles verloren. Tatsächlich läuft nur die Sofort-Frist ab – der Papierkorb bleibt. Der Text sagt das jetzt („Noch 30 Sekunden – danach über den Papierkorb"); nur bei einzelnen Blöcken, die wirklich verworfen werden, steht „danach endgültig".

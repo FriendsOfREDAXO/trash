@@ -18,7 +18,7 @@
     gap: .5em .75em;
     max-width: min(560px, calc(100vw - 32px));
     margin: 0;
-    padding: 16px 20px;
+    padding: 16px 44px 16px 20px;
     border: 0;
     border-radius: 10px;
     /* REDAXO-Primaerblau (#4b9ad9) als Basis - auffaellig und systemkonform */
@@ -82,26 +82,37 @@
     font-weight: 700;
 }
 
-/* Schliessen-Schaltflaeche */
+/* Schliessen: oben rechts in der Ecke, ausserhalb des Textflusses */
 .trash-undo-toast .trash-undo-close {
-    flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     padding: 0;
     border: 0;
     border-radius: 50%;
-    background: transparent;
+    background: rgba(255, 255, 255, .18);
     color: #fff;
-    opacity: .65;
-    font-size: 18px;
+    font-size: 20px;
+    font-weight: 400;
     line-height: 1;
     cursor: pointer;
+    transition: background-color .15s, transform .15s;
 }
 
-.trash-undo-toast .trash-undo-close:hover,
+.trash-undo-toast .trash-undo-close:hover {
+    background: rgba(255, 255, 255, .34);
+    transform: scale(1.08);
+}
+
 .trash-undo-toast .trash-undo-close:focus-visible {
-    opacity: 1;
-    background: rgba(255, 255, 255, .12);
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    background: rgba(255, 255, 255, .34);
 }
 
 /* Der Countdown pulsiert nur in den letzten Sekunden - und nur, wenn die

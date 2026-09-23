@@ -295,9 +295,12 @@ class TrashService
      */
     public function handleArticleDeletion(rex_extension_point $ep): void
     {
-        // Get article data from extension point
-        $articleId = $ep->getParam('id');
-        $clangId = $ep->getParam('clang');
+        // Get article data from extension point.
+        // ART_PRE_DELETED liefert kein 'clang' - der Core liest die Daten
+        // selbst aus der Startsprache. Ohne diesen Bezug lieferte
+        // rex_article::get() null und Kategorien landeten nie im Papierkorb.
+        $articleId = (int) $ep->getParam('id');
+        $clangId = (int) $ep->getParam('clang', rex_clang::getStartId());
         $parentId = $ep->getParam('parent_id');
         $name = $ep->getParam('name');
         $status = $ep->getParam('status');
@@ -306,9 +309,17 @@ class TrashService
         $trashTable = $tables['trash_article'];
         $trashSliceTable = $tables['trash_slice'];
         
-        // Check if article already exists in trash (avoids duplicates with multiple languages)
+        // ART_PRE_DELETED feuert je Sprache - der Eintrag soll aber nur einmal
+        // entstehen. Die Pruefung darf sich dabei nicht allein auf article_id
+        // stuetzen: REDAXO vergibt geloeschte IDs neu, sonst waere ein spaeter
+        // geloeschter Artikel mit derselben ID faelschlich ein "Duplikat" und
+        // wuerde gar nicht gesichert. Deshalb zusaetzlich auf den laufenden
+        // Loeschvorgang begrenzen.
         $sql = rex_sql::factory();
-        $exists = $sql->getArray('SELECT id FROM ' . $trashTable . ' WHERE article_id = :article_id', ['article_id' => $articleId]);
+        $exists = $sql->getArray(
+            'SELECT id FROM ' . $trashTable . ' WHERE article_id = :article_id AND deleted_at >= :since',
+            ['article_id' => $articleId, 'since' => date('Y-m-d H:i:s', time() - 5)],
+        );
         
         if (empty($exists)) {
             // Save article reference for all available languages (only once)

@@ -28,20 +28,32 @@ if (rex_addon::get('cronjob')->isAvailable()) {
 if (rex::isBackend() && null !== rex::getUser() && QuickUndo::isEnabled()) {
     QuickUndo::addAssets();
 
+    // ART_DELETED feuert ausschliesslich fuer Artikel (startarticle=0),
+    // CAT_DELETED fuer Kategorien - der Typ steht also schon durch den
+    // Extension Point fest. Beide feuern je Sprache, der Hinweis wird
+    // deshalb nur einmal ausgegeben (siehe renderNotice()).
     rex_extension::register('ART_DELETED', static function (rex_extension_point $ep): string {
-        $isCategory = 1 === (int) $ep->getParam('status', 0) && '' !== (string) $ep->getParam('catname', '');
-
-        return QuickUndo::renderNotice(
-            $isCategory ? 'category' : 'article',
-            ['article_id' => (int) $ep->getParam('id'), 'page' => 'structure', 'category_id' => (int) $ep->getParam('parent_id', 0)],
-        );
+        return QuickUndo::renderNotice('article', [
+            'article_id' => (int) $ep->getParam('id'),
+            'page' => 'structure',
+            'category_id' => (int) $ep->getParam('parent_id', 0),
+        ]);
     });
 
-    rex_extension::register('CAT_DELETED', static function (rex_extension_point $ep): string {
-        return QuickUndo::renderNotice(
-            'category',
-            ['article_id' => (int) $ep->getParam('id'), 'page' => 'structure', 'category_id' => (int) $ep->getParam('parent_id', 0)],
-        );
+    // Bei Kategorien verpackt rex_api_category_delete die Meldung in ein
+    // rex_api_result und gibt sie escaped aus - der Rueckgabewert des
+    // Extension Points erreicht die Seite also nicht als HTML. Der Hinweis
+    // wird deshalb gemerkt und spaeter ueber PAGE_TITLE_SHOWN ausgegeben.
+    rex_extension::register('CAT_DELETED', static function (rex_extension_point $ep): void {
+        QuickUndo::queueNotice('category', [
+            'article_id' => (int) $ep->getParam('id'),
+            'page' => 'structure',
+            'category_id' => (int) $ep->getParam('parent_id', 0),
+        ]);
+    });
+
+    rex_extension::register('PAGE_TITLE_SHOWN', static function (rex_extension_point $ep): string {
+        return (string) $ep->getSubject() . QuickUndo::flushQueuedNotice();
     });
 
     // Bloecke werden von structure/history gesichert; ohne das Plugin gibt es

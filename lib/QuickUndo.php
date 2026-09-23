@@ -37,6 +37,12 @@ class QuickUndo
 
     private const CSRF_ID = 'trash_quick_undo';
 
+    /** ART_DELETED und CAT_DELETED feuern je Sprache - der Hinweis genuegt einmal */
+    private static bool $noticeRendered = false;
+
+    /** @var array{type: 'article'|'category'|'slice', params: array<string, int|string>}|null */
+    private static ?array $queuedNotice = null;
+
     public static function isEnabled(): bool
     {
         return (bool) rex_config::get('trash', 'quick_undo', true);
@@ -64,9 +70,10 @@ class QuickUndo
      */
     public static function renderNotice(string $type, array $params): string
     {
-        if (!self::isEnabled()) {
+        if (!self::isEnabled() || self::$noticeRendered) {
             return '';
         }
+        self::$noticeRendered = true;
 
         $timeout = self::getTimeout();
         $label = match ($type) {
@@ -101,6 +108,31 @@ class QuickUndo
             . '</span>'
             . '<button type="button" class="trash-undo-close" aria-label="' . rex_escape(rex_i18n::msg('trash_undo_close')) . '">&times;</button>'
             . '</div>';
+    }
+
+    /**
+     * Hinweis vormerken, wenn er an der Fundstelle nicht als HTML ausgegeben
+     * werden kann (siehe CAT_DELETED in der boot.php).
+     *
+     * @param 'article'|'category'|'slice' $type
+     * @param array<string, int|string> $params
+     */
+    public static function queueNotice(string $type, array $params): void
+    {
+        self::$queuedNotice ??= ['type' => $type, 'params' => $params];
+    }
+
+    /** Vorgemerkten Hinweis ausgeben, falls vorhanden */
+    public static function flushQueuedNotice(): string
+    {
+        if (null === self::$queuedNotice) {
+            return '';
+        }
+
+        $notice = self::$queuedNotice;
+        self::$queuedNotice = null;
+
+        return self::renderNotice($notice['type'], $notice['params']);
     }
 
     /**
