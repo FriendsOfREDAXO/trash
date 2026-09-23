@@ -7,14 +7,16 @@
 
 use FriendsOfREDAXO\trash\TrashService;
 
-// Rechteprüfung
-if (!rex::getUser()->isAdmin()) {
-    // Nur Admins dürfen auf den Papierkorb zugreifen
+// Rechteprüfung: trash[] zum Ansehen und Wiederherstellen,
+// trash[delete] zusätzlich fürs endgültige Entfernen. Admins haben beides.
+$user = rex::getUser();
+if (!TrashService::mayView($user)) {
     echo rex_view::error(rex_i18n::msg('no_permission'));
     return;
 }
 
-// TrashService initialisieren
+$mayDelete = TrashService::mayDelete($user);
+
 $trashService = new TrashService();
 
 // Durchführung von Aktionen (Wiederherstellen oder Endgültig löschen)
@@ -31,12 +33,23 @@ $trashSliceMetaTable = $tables['trash_slice_meta'];
 $message = '';
 
 // Debug-Modus zum Anzeigen detaillierter Fehlermeldungen
-$debug = false; // Auf true setzen für Entwicklungszwecke
 
 // Aktionen verarbeiten
+// Fremde Einträge sind für Nicht-Admins unsichtbar - und damit auch
+// für jede Aktion gesperrt, selbst bei geratener ID.
+if ('' !== $func && $articleId > 0 && !TrashService::mayAccessEntry($user, $articleId)) {
+    echo rex_view::error(rex_i18n::msg('no_permission'));
+    return;
+}
+
+if (in_array($func, ['delete', 'empty'], true) && !$mayDelete) {
+    echo rex_view::error(rex_i18n::msg('no_permission'));
+    return;
+}
+
 if ($func === 'restore' && $articleId > 0) {
     // Use TrashService to restore article
-    list($success, $resultMessage, $idChanged, $originalRequestedId, $newArticleId, $parentExists, $priorityChangedInfo) = $trashService->restoreArticle($articleId, $debug);
+    list($success, $resultMessage, $idChanged, $originalRequestedId, $newArticleId, $parentExists, $priorityChangedInfo) = $trashService->restoreArticle($articleId);
     
     if ($success) {
         // Check if ID was changed
@@ -63,11 +76,7 @@ if ($func === 'restore' && $articleId > 0) {
             $message .= rex_view::warning('Artikel wiederhergestellt, konnte aber nicht aus Papierkorb entfernt werden: ' . $deleteMessage);
         }
     } else {
-        $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . $resultMessage);
-        
-        if ($debug) {
-            echo '<pre>FEHLER beim Wiederherstellen des Artikels: ' . $resultMessage . '</pre>';
-        }
+        $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . rex_escape($resultMessage));
     }
 } elseif ($func === 'delete' && $articleId > 0) {
     // Use TrashService to permanently delete article
@@ -80,7 +89,7 @@ if ($func === 'restore' && $articleId > 0) {
     }
 } elseif ($func === 'empty') {
     // Use TrashService to empty trash
-    list($success, $resultMessage) = $trashService->emptyTrash();
+    list($success, $resultMessage) = $trashService->emptyTrash($user);
     
     if ($success) {
         $message = rex_view::success(rex_i18n::msg('trash_emptied'));
@@ -91,136 +100,138 @@ if ($func === 'restore' && $articleId > 0) {
 // Ausgabe der Liste der Artikel im Papierkorb
 echo $message;
 
-// SQL-Query, der Sprachen zusammengefasst darstellt
-$sql = 'SELECT a.*, 
+// Ein Artikel wird immer in allen Sprachen geloescht. Die Spalte "Inhalte in"
+// zeigt deshalb nicht "in welcher Sprache geloescht", sondern in welchen
+// Sprachen ueberhaupt Inhalte gesichert wurden - Kategorien haben keine.
+// Admins sehen alles, alle anderen nur ihre eigenen Löschungen.
+[$visibility, $visibilityParams] = TrashService::visibilityCondition($user, 'a');
+
+$sql = 'SELECT a.*,
         COUNT(s.id) as slice_count,
         GROUP_CONCAT(DISTINCT s.clang_id) as languages
-        FROM ' . $trashTable . ' a 
-        LEFT JOIN ' . $trashSliceTable . ' s 
-        ON a.id = s.trash_article_id 
-        GROUP BY a.id 
+        FROM ' . $trashTable . ' a
+        LEFT JOIN ' . $trashSliceTable . ' s
+        ON a.id = s.trash_article_id
+        WHERE ' . $visibility . '
+        GROUP BY a.id
         ORDER BY a.deleted_at DESC';
 
+foreach ($visibilityParams as $key => $value) {
+    $sql = str_replace(':' . $key, rex_sql::factory()->escape($value), $sql);
+}
+
 $list = rex_list::factory($sql);
-$list->addTableAttribute('class', 'table-striped');
+$list->addTableAttribute('class', 'table-hover');
 
-// Spalten definieren - nur die wichtigsten behalten
-$list->removeColumn('id');
-$list->removeColumn('meta_attributes');
-$list->removeColumn('path');
-$list->removeColumn('createdate');
-$list->removeColumn('updatedate');
-$list->removeColumn('createuser');
-$list->removeColumn('updateuser');
-$list->removeColumn('revision');
-$list->removeColumn('template_id');
+// Technische Spalten braucht niemand auf einen Blick; das Wesentliche steht
+// als Zusatzzeile unter dem Namen.
+foreach ([
+    'id', 'meta_attributes', 'path', 'createdate', 'updatedate', 'createuser',
+    'updateuser', 'revision', 'template_id', 'parent_id', 'catpriority', 'priority',
+] as $column) {
+    $list->removeColumn($column);
+}
 
-// Die Originalspalten behalten, aber ausblenden
-// - diese werden später referenziert
-$list->setColumnLabel('article_id', rex_i18n::msg('trash_original_id'));
+// Symbol: Artikel oder Kategorie, online oder offline
+$list->addColumn('icon', '', 0);
+$list->setColumnLabel('icon', '');
+$list->setColumnFormat('icon', 'custom', static function ($params) {
+    $isCategory = 1 == $params['list']->getValue('startarticle');
+    $isOnline = 1 == $params['list']->getValue('status');
+
+    $title = rex_i18n::msg($isCategory ? 'trash_type_category' : 'trash_type_article')
+        . ' – ' . rex_i18n::msg($isOnline ? 'trash_state_online' : 'trash_state_offline');
+
+    return '<i class="rex-icon ' . ($isCategory ? 'rex-icon-category' : 'rex-icon-article')
+        . ' ' . ($isOnline ? 'text-success' : 'text-muted') . '" title="' . rex_escape($title) . '"></i>';
+});
+
+// Name mit Zusatzinfos darunter - die Zeile bleibt schmal, die Details
+// sind trotzdem da, wenn man sie braucht.
 $list->setColumnLabel('name', rex_i18n::msg('trash_article_name'));
-$list->setColumnLabel('catname', rex_i18n::msg('trash_category_name'));
-$list->setColumnLabel('parent_id', rex_i18n::msg('trash_parent_id'));
+$list->setColumnFormat('name', 'custom', static function ($params) {
+    $isCategory = 1 == $params['list']->getValue('startarticle');
+    $name = (string) ($isCategory ? $params['list']->getValue('catname') : $params['list']->getValue('name'));
+
+    $meta = [rex_i18n::msg($isCategory ? 'trash_type_category' : 'trash_type_article')];
+    if (!$isCategory) {
+        $meta[] = rex_i18n::msg('trash_slice_count_info', (string) (int) $params['list']->getValue('slice_count'));
+    }
+    $meta[] = rex_i18n::msg('trash_original_id') . ' ' . (int) $params['list']->getValue('article_id');
+
+    return '<strong>' . rex_escape($name) . '</strong>'
+        . '<br><small class="text-muted">' . rex_escape(implode(' · ', $meta)) . '</small>';
+});
+
 $list->setColumnLabel('languages', rex_i18n::msg('trash_languages'));
-$list->setColumnLabel('deleted_at', rex_i18n::msg('trash_deleted_at'));
-$list->setColumnLabel('deleted_by', rex_i18n::msg('trash_deleted_by'));
-
-// Eine einfachere Herangehensweise:
-// 1. Typ als normaler Text mit Symbolen
-$list->addColumn('typ', 'Artikeltyp', -1);
-$list->setColumnFormat('typ', 'custom', function ($params) {
-    $startArticle = $params['list']->getValue('startarticle');
-    $status = $params['list']->getValue('status');
-    
-    $type = $startArticle == 1 ? 'Kategorie' : 'Artikel';
-    $statusText = $status == 1 ? 'Online' : 'Offline';
-    
-    $icon = $startArticle == 1 ? 
-        '<i class="rex-icon rex-icon-category"></i>' : 
-        '<i class="rex-icon rex-icon-article"></i>';
-    
-    $statusIcon = $status == 1 ? 
-        '<span class="text-success"><i class="rex-icon rex-icon-online"></i></span>' : 
-        '<span class="text-danger"><i class="rex-icon rex-icon-offline"></i></span>';
-    
-    return $icon . ' ' . $statusIcon . '<br>' . $type . ' (' . $statusText . ')';
-});
-
-// 2. Infospalte mit Details
-$list->addColumn('details', 'Details', -1);
-$list->setColumnFormat('details', 'custom', function ($params) {
-    $startArticle = $params['list']->getValue('startarticle');
-    $output = [];
-    
-    // Priorität hinzufügen je nach Artikeltyp
-    if ($startArticle == 1) {
-        $output[] = 'Kat-Prio: ' . $params['list']->getValue('catpriority');
-    } else {
-        $output[] = 'Prio: ' . $params['list']->getValue('priority');
-    }
-    
-    // Template-ID hinzufügen
-    $output[] = 'Template: ' . $params['list']->getValue('template_id');
-    
-    // Weitere Infos
-    $output[] = 'Original-ID: ' . $params['list']->getValue('article_id');
-    $output[] = 'Slices: ' . $params['list']->getValue('slice_count');
-    
-    return implode('<br>', $output);
-});
-
-// Formatierungen für verbleibende Spalten
-$list->setColumnFormat('deleted_at', 'date', 'd.m.Y H:i');
-$list->setColumnFormat('languages', 'custom', function($params) {
+$list->setColumnFormat('languages', 'custom', static function ($params) {
     if (!$params['value']) {
-        return rex_i18n::msg('trash_no_languages');
+        return '<span class="text-muted">' . rex_i18n::msg('trash_no_content') . '</span>';
     }
-    $langIds = explode(',', $params['value']);
+
     $names = [];
-    foreach ($langIds as $id) {
-        $clang = rex_clang::get((int)$id);
-        $names[] = $clang ? $clang->getName() : 'Unbekannt';
+    foreach (explode(',', (string) $params['value']) as $id) {
+        $clang = rex_clang::get((int) $id);
+        $names[] = $clang ? $clang->getName() : (string) $id;
     }
-    return implode(', ', $names);
+
+    return rex_escape(implode(', ', $names));
 });
 
-// Verstecke nicht benötigte Spalten
+$list->setColumnLabel('deleted_at', rex_i18n::msg('trash_deleted_at'));
+$list->setColumnFormat('deleted_at', 'custom', static function ($params) {
+    $time = strtotime((string) $params['value']);
+
+    return false === $time
+        ? rex_escape((string) $params['value'])
+        : rex_escape(rex_formatter::intlDateTime($time, IntlDateFormatter::SHORT));
+});
+
+$list->setColumnLabel('deleted_by', rex_i18n::msg('trash_deleted_by'));
+$list->setColumnFormat('deleted_by', 'custom', static function ($params) {
+    $value = trim((string) $params['value']);
+
+    return '' === $value
+        ? '<span class="text-muted">' . rex_i18n::msg('trash_deleted_by_system') . '</span>'
+        : rex_escape($value);
+});
+
+// Nur noch intern benoetigt, nicht als eigene Spalte
 $list->removeColumn('status');
 $list->removeColumn('startarticle');
 $list->removeColumn('slice_count');
 $list->removeColumn('article_id');
-$list->removeColumn('catpriority');
-$list->removeColumn('priority');
+$list->removeColumn('catname');
 
-// Aktionsspalten hinzufügen
+// Aktionen als Text mit Symbol - wie in der Strukturverwaltung
 $list->addColumn('restore', '<i class="rex-icon rex-icon-refresh"></i> ' . rex_i18n::msg('trash_restore'));
 $list->setColumnParams('restore', ['func' => 'restore', 'id' => '###id###']);
+$list->setColumnLayout('restore', ['<th class="rex-table-action" colspan="' . ($mayDelete ? 2 : 1) . '">' . rex_i18n::msg('trash_functions') . '</th>', '<td class="rex-table-action">###VALUE###</td>']);
 
-$list->addColumn('delete', '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_delete'));
-$list->setColumnParams('delete', ['func' => 'delete', 'id' => '###id###']);
-$list->addLinkAttribute('delete', 'data-confirm', rex_i18n::msg('trash_confirm_delete'));
+// Endgültiges Löschen nur mit dem entsprechenden Recht
+if ($mayDelete) {
+    $list->addColumn('delete', '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_delete'));
+    $list->setColumnParams('delete', ['func' => 'delete', 'id' => '###id###']);
+    $list->setColumnLayout('delete', ['', '<td class="rex-table-action">###VALUE###</td>']);
+    $list->addLinkAttribute('delete', 'data-confirm', rex_i18n::msg('trash_confirm_delete'));
+    $list->addLinkAttribute('delete', 'class', 'rex-link-expanded');
+}
 
-// Keine Einträge Meldung
 $list->setNoRowsMessage(rex_i18n::msg('trash_is_empty'));
 
-// Ausgabe der Liste
-$content = $list->get();
+// "Papierkorb leeren" nur anbieten, wenn etwas drin ist
+$options = '';
+if ($mayDelete && TrashService::countVisibleFor($user) > 0) {
+    $options = '<a class="btn btn-delete btn-xs" href="' . rex_url::currentBackendPage(['func' => 'empty']) . '"'
+        . ' data-confirm="' . rex_escape(rex_i18n::msg('trash_confirm_empty_trash')) . '">'
+        . '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_empty_trash') . '</a>';
+}
 
-// Buttons für Aktionen über der Liste
-$buttons = '
-<div class="row">
-    <div class="col-sm-12">
-        <div class="pull-right">
-            <a href="' . rex_url::currentBackendPage(['func' => 'empty']) . '" class="btn btn-danger" data-confirm="' . rex_i18n::msg('trash_confirm_empty_trash') . '">
-                <i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_empty_trash') . '
-            </a>
-        </div>
-    </div>
-</div>';
-
-// Ausgabe des Inhalts
+// "body" bekommt den Innenabstand des Panels, "content" wird roh ausgegeben -
+// der Erklaertext gehoert deshalb in body, die Tabelle randlos in content.
 $fragment = new rex_fragment();
 $fragment->setVar('title', rex_i18n::msg('trash'), false);
-$fragment->setVar('content', $content, false);
-$fragment->setVar('options', $buttons, false);
+$fragment->setVar('body', '<p class="rex-panel-intro">' . rex_i18n::msg('trash_intro') . '</p>', false);
+$fragment->setVar('content', $list->get(), false);
+$fragment->setVar('options', $options, false);
 echo $fragment->parse('core/page/section.php');

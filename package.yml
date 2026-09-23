@@ -1,19 +1,33 @@
 package: trash
-version: '1.1.0'
+version: '2.0.0'
 author: FriendsOfREDAXO
 supportpage: https://github.com/FriendsOfREDAXO/trash/
 
 requires:
-    redaxo: '^5.10'
+    redaxo: '^5.18'
     php:
         version: '>=8.1'
     packages:
         structure: '^2.0.0'
 
+# trash enthaelt seit 2.0.0 die Sofort-Rueckgaengig-Funktion des AddOns undo.
+# Beide gleichzeitig wuerden jede Loeschung doppelt sichern und zwei
+# konkurrierende Wiederherstellungswege anbieten.
+conflicts:
+    packages:
+        undo: '*'
+
+installer_ignore:
+    - .github
+    - .gitignore
+
 page:
     block: system
     title: translate:trash
-    perm: admin
-    icon: rex-icon fa fa-trash
+    perm: trash[]
+    # Leerer Papierkorb: Umriss. Liegt etwas drin, wechselt boot.php
+    # auf die gefuellte Variante (fa-solid fa-trash).
+    icon: 'rex-icon fa-regular fa-trash-can'
     subpages:
         trash: { title: translate:trash_main }
+        settings: { title: translate:trash_settings, icon: 'rex-icon fa-cog' }

@@ -1,0 +1,226 @@
+/**
+ * Trash AddOn - Sofort-Rueckgaengig als Toast
+ *
+ * Der Hinweis erscheint fixiert am unteren Bildschirmrand, damit er nicht
+ * zwischen den uebrigen Meldungen der Seite untergeht. Er verschwindet von
+ * selbst, sobald die Frist abgelaufen ist.
+ */
+
+.trash-undo-toast {
+    position: fixed;
+    z-index: 1100; /* ueber Backend-Navigation und Sticky-Toolbars */
+    left: 50%;
+    bottom: 40px;
+    transform: translateX(-50%) translateY(0);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5em .75em;
+    max-width: min(560px, calc(100vw - 32px));
+    margin: 0;
+    padding: 16px 44px 16px 20px;
+    border: 0;
+    border-radius: 10px;
+    /* REDAXO-Primaerblau (#4b9ad9) als Basis - auffaellig und systemkonform */
+    background: linear-gradient(135deg, #4b9ad9 0%, #3b7fb8 100%);
+    color: #fff;
+    /* Weit gestreuter, in der Akzentfarbe eingefaerbter Schatten: der Toast
+       liest sich dadurch als schwebend statt angedockt */
+    box-shadow:
+        0 20px 50px -12px rgba(30, 80, 130, .6),
+        0 8px 20px -8px rgba(0, 0, 0, .35);
+    font-size: 15px;
+    line-height: 1.45;
+    animation: trash-undo-in .34s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+/* Beim Ausblenden nach Fristablauf */
+.trash-undo-toast.is-leaving {
+    animation: trash-undo-out .35s ease-in both;
+}
+
+.trash-undo-toast .trash-undo-text {
+    flex: 1 1 auto;
+    min-width: 12em;
+}
+
+.trash-undo-toast .trash-undo-link {
+    flex: 0 0 auto;
+    padding: 8px 16px;
+    border-radius: 6px;
+    background: #fff;
+    color: #2a6597;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+}
+
+.trash-undo-toast .trash-undo-link:hover,
+.trash-undo-toast .trash-undo-link:focus {
+    background: #f2f8fd;
+    color: #1d4d75;
+    text-decoration: none;
+}
+
+.trash-undo-toast .trash-undo-link:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.trash-undo-toast .trash-undo-countdown {
+    flex: 0 0 auto;
+    opacity: .92;
+    font-size: .9em;
+}
+
+.trash-undo-toast .trash-undo-seconds {
+    display: inline-block;
+    min-width: 1.5em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+/* Schliessen: oben rechts in der Ecke, ausserhalb des Textflusses */
+.trash-undo-toast .trash-undo-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .18);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color .15s, transform .15s;
+}
+
+.trash-undo-toast .trash-undo-close:hover {
+    background: rgba(255, 255, 255, .34);
+    transform: scale(1.08);
+}
+
+.trash-undo-toast .trash-undo-close:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    background: rgba(255, 255, 255, .34);
+}
+
+/* Der Countdown pulsiert nur in den letzten Sekunden - und nur, wenn die
+   Systemeinstellung Bewegung erlaubt */
+@media (prefers-reduced-motion: no-preference) {
+    .trash-undo-toast.is-expiring .trash-undo-seconds {
+        animation: trash-undo-pulse 1s ease-in-out infinite;
+        color: #fff3b0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .trash-undo-toast,
+    .trash-undo-toast.is-leaving {
+        animation: none;
+    }
+}
+
+@keyframes trash-undo-in {
+    0%   { opacity: 0; transform: translateX(-50%) translateY(32px) scale(.94); }
+    60%  { opacity: 1; transform: translateX(-50%) translateY(-6px) scale(1.02); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* Einmaliger Ring beim Erscheinen - zieht den Blick auf den Toast */
+.trash-undo-toast::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 13px;
+    border: 2px solid #4b9ad9;
+    opacity: 0;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .trash-undo-toast::after {
+        animation: trash-undo-ring .9s ease-out .15s 2 both;
+    }
+}
+
+@keyframes trash-undo-ring {
+    0%   { opacity: .75; transform: scale(1); }
+    100% { opacity: 0;   transform: scale(1.06); }
+}
+
+@keyframes trash-undo-out {
+    from { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(20px) scale(.97); }
+}
+
+@keyframes trash-undo-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.18); }
+}
+
+/* Schmale Bildschirme: volle Breite, Aktion unter den Text */
+@media (max-width: 600px) {
+    .trash-undo-toast {
+        left: 16px;
+        right: 16px;
+        bottom: 20px;
+        max-width: none;
+        transform: none;
+        animation-name: trash-undo-in-mobile;
+    }
+
+    .trash-undo-toast.is-leaving {
+        animation-name: trash-undo-out-mobile;
+    }
+
+    @keyframes trash-undo-in-mobile {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes trash-undo-out-mobile {
+        from { opacity: 1; transform: translateY(0); }
+        to   { opacity: 0; transform: translateY(16px); }
+    }
+}
+
+/**
+ * Erklaertext im Panel-Kopfbereich: etwas zurueckgenommen und mit klarer
+ * Trennlinie zur Tabelle, damit er nicht an ihr klebt.
+ */
+.rex-page-section .panel-body > .rex-panel-intro {
+    margin: 0;
+    color: #6a737d;
+}
+
+.rex-page-section .panel-body:has(> .rex-panel-intro:only-child) {
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+}
+
+/**
+ * Menuesymbol: Der leere Papierkorb bleibt unauffaellig wie die uebrigen
+ * Menuepunkte. Liegt etwas drin, faerbt sich das gefuellte Symbol ein -
+ * so faellt der Unterschied auch im dunklen Menue sofort auf.
+ */
+.rex-nav-main .trash-icon-filled,
+.rex-navigation .trash-icon-filled {
+    color: #f0ad4e;
+}
+
+/* Im aktiven (hellen) Menuepunkt braucht es einen dunkleren Ton */
+.rex-nav-main .active > a .trash-icon-filled,
+.rex-navigation .active > a .trash-icon-filled {
+    color: #b3690a;
+}

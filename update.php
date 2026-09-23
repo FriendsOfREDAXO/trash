@@ -1,104 +1,88 @@
 <?php
 
-rex_sql_table::get(rex::getTable('trash_article'))
-    ->ensurePrimaryIdColumn()
-    ->ensureColumn(new rex_sql_column('article_id', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('parent_id', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('name', 'varchar(255)'))
-    ->ensureColumn(new rex_sql_column('catname', 'varchar(255)'))
-    ->ensureColumn(new rex_sql_column('catpriority', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('path', 'varchar(255)'))  // Neue Spalte statt in attributes
-    ->ensureColumn(new rex_sql_column('priority', 'int(10) unsigned'))  // Neue Spalte statt in attributes
-    ->ensureColumn(new rex_sql_column('template_id', 'int(10) unsigned'))  // Neue Spalte statt in attributes
-    ->ensureColumn(new rex_sql_column('createdate', 'datetime'))  // Neue Spalte statt in attributes
-    ->ensureColumn(new rex_sql_column('createuser', 'varchar(255)'))  // Neue Spalte statt in attributes
-    ->ensureColumn(new rex_sql_column('updatedate', 'datetime'))  // Neue Spalte statt in attributes
-    ->ensureColumn(new rex_sql_column('updateuser', 'varchar(255)'))  // Neue Spalte statt in attributes
-    ->ensureColumn(new rex_sql_column('revision', 'int(10) unsigned', false, '0'))  // Neue Spalte statt in attributes
-    ->ensureColumn(new rex_sql_column('meta_attributes', 'longtext'))
-    ->ensureColumn(new rex_sql_column('status', 'tinyint(1)'))
-    ->ensureColumn(new rex_sql_column('startarticle', 'tinyint(1)', false, '0'))
-    ->ensureColumn(new rex_sql_column('deleted_at', 'datetime'))
-    ->ensureColumn(new rex_sql_column('deleted_by', 'varchar(255)'))
-    ->ensure();
+/** @var rex_addon $this */
 
-rex_sql_table::get(rex::getTable('trash_article_slice'))
-    ->ensurePrimaryIdColumn()
-    ->ensureColumn(new rex_sql_column('trash_article_id', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('article_id', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('clang_id', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('ctype_id', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('module_id', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('priority', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('revision', 'int(10) unsigned', false, '0'))
-    ->ensureColumn(new rex_sql_column('status', 'tinyint(1)', false, '1'))
-    ->ensureColumn(new rex_sql_column('value1', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value2', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value3', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value4', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value5', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value6', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value7', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value8', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value9', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value10', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value11', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value12', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value13', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value14', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value15', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value16', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value17', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value18', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value19', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('value20', 'mediumtext', true))
-    ->ensureColumn(new rex_sql_column('media1', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media2', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media3', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media4', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media5', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media6', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media7', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media8', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media9', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('media10', 'varchar(255)', true))
-    ->ensureColumn(new rex_sql_column('medialist1', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist2', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist3', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist4', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist5', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist6', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist7', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist8', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist9', 'text', true))
-    ->ensureColumn(new rex_sql_column('medialist10', 'text', true))
-    ->ensureColumn(new rex_sql_column('link1', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link2', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link3', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link4', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link5', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link6', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link7', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link8', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link9', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('link10', 'varchar(10)', true))
-    ->ensureColumn(new rex_sql_column('linklist1', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist2', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist3', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist4', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist5', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist6', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist7', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist8', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist9', 'text', true))
-    ->ensureColumn(new rex_sql_column('linklist10', 'text', true))
-    ->ensureIndex(new rex_sql_index('trash_article_id', ['trash_article_id']))
-    ->ensure();
+// Tabellenstruktur wird ausschliesslich in install.php gepflegt; alle
+// Definitionen sind idempotent (ensureColumn/ensureIndex/ensure).
+$this->includeFile('install.php');
 
-// Spezielle Tabelle für Slice-Meta-Daten
-rex_sql_table::get(rex::getTable('trash_slice_meta'))
-    ->ensurePrimaryIdColumn()
-    ->ensureColumn(new rex_sql_column('trash_slice_id', 'int(10) unsigned'))
-    ->ensureColumn(new rex_sql_column('meta_data', 'longtext'))
-    ->ensureIndex(new rex_sql_index('trash_slice_id', ['trash_slice_id']))
-    ->ensure();
+// ---------------------------------------------------------------------
+// Uebernahme aus dem AddOn "undo"
+//
+// Seit 2.0.0 enthaelt trash die Sofort-Rueckgaengig-Funktion. War undo
+// zuvor installiert, liegen dort moeglicherweise noch Eintraege aus einer
+// gerade erfolgten Loeschung. Sie werden in den Papierkorb uebernommen,
+// damit beim Umstieg nichts verloren geht.
+// ---------------------------------------------------------------------
+$articleUndo = rex::getTable('article_undo');
+
+if (rex_sql_table::get($articleUndo)->exists()) {
+    try {
+        $sql = rex_sql::factory();
+        $rows = $sql->getArray(
+            'SELECT u.* FROM ' . $articleUndo . ' u
+             WHERE NOT EXISTS (
+                SELECT 1 FROM ' . rex::getTable('trash_article') . ' t WHERE t.article_id = u.id
+             )
+             GROUP BY u.id',
+        );
+
+        foreach ($rows as $row) {
+            $insert = rex_sql::factory();
+            $insert->setTable(rex::getTable('trash_article'));
+            $insert->setValue('article_id', (int) $row['id']);
+            $insert->setValue('parent_id', (int) ($row['parent_id'] ?? 0));
+            $insert->setValue('name', (string) ($row['name'] ?? ''));
+            $insert->setValue('catname', (string) ($row['catname'] ?? ''));
+            $insert->setValue('catpriority', (int) ($row['catpriority'] ?? 0));
+            $insert->setValue('priority', (int) ($row['priority'] ?? 0));
+            $insert->setValue('path', (string) ($row['path'] ?? ''));
+            $insert->setValue('template_id', (int) ($row['template_id'] ?? 0));
+            $insert->setValue('status', (int) ($row['status'] ?? 0));
+            $insert->setValue('startarticle', (int) ($row['startarticle'] ?? 0));
+            $insert->setValue('revision', (int) ($row['revision'] ?? 0));
+            $insert->setValue('createdate', (string) ($row['createdate'] ?? date('Y-m-d H:i:s')));
+            $insert->setValue('createuser', (string) ($row['createuser'] ?? ''));
+            $insert->setValue('updatedate', (string) ($row['updatedate'] ?? date('Y-m-d H:i:s')));
+            $insert->setValue('updateuser', (string) ($row['updateuser'] ?? ''));
+            $insert->setValue('deleted_at', date('Y-m-d H:i:s'));
+            $insert->setValue('deleted_by', (string) ($row['updateuser'] ?? ''));
+            $insert->insert();
+
+            $trashArticleId = (int) $insert->getLastId();
+
+            // Zugehoerige Slices uebernehmen, soweit vorhanden
+            $sliceUndo = rex::getTable('article_slice_undo');
+            if (!rex_sql_table::get($sliceUndo)->exists()) {
+                continue;
+            }
+
+            $slices = rex_sql::factory();
+            $slices->setQuery('SELECT * FROM ' . $sliceUndo . ' WHERE article_id = :id', ['id' => (int) $row['id']]);
+
+            $targetColumns = [];
+            foreach (rex_sql::showColumns(rex::getTable('trash_article_slice')) as $column) {
+                $targetColumns[$column['name']] = true;
+            }
+
+            foreach ($slices as $slice) {
+                $sliceInsert = rex_sql::factory();
+                $sliceInsert->setTable(rex::getTable('trash_article_slice'));
+                $sliceInsert->setValue('trash_article_id', $trashArticleId);
+
+                foreach ($slice->getRow() as $column => $value) {
+                    // "id" wird neu vergeben, unbekannte Spalten uebergehen
+                    if ('id' === $column || !isset($targetColumns[$column])) {
+                        continue;
+                    }
+                    $sliceInsert->setValue($column, $value);
+                }
+
+                $sliceInsert->insert();
+            }
+        }
+    } catch (Throwable $e) {
+        // Ein misslungener Uebertrag darf das Update nicht blockieren
+        rex_logger::logException($e);
+    }
+}
