@@ -208,3 +208,19 @@
     padding-bottom: 15px;
     border-bottom: 1px solid #ddd;
 }
+
+/**
+ * Menuesymbol: Der leere Papierkorb bleibt unauffaellig wie die uebrigen
+ * Menuepunkte. Liegt etwas drin, faerbt sich das gefuellte Symbol ein -
+ * so faellt der Unterschied auch im dunklen Menue sofort auf.
+ */
+.rex-nav-main .trash-icon-filled,
+.rex-navigation .trash-icon-filled {
+    color: #f0ad4e;
+}
+
+/* Im aktiven (hellen) Menuepunkt braucht es einen dunkleren Ton */
+.rex-nav-main .active > a .trash-icon-filled,
+.rex-navigation .active > a .trash-icon-filled {
+    color: #b3690a;
+}

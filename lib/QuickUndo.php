@@ -287,14 +287,16 @@ class QuickUndo
         return \rex_view::success(rex_i18n::msg('trash_undo_slice_restored'));
     }
 
-    /** Assets nur laden, wenn die Funktion aktiv ist */
+    /**
+     * Script fuer den Toast. Das Stylesheet laedt die boot.php ohnehin
+     * immer - es faerbt auch das Menuesymbol ein.
+     */
     public static function addAssets(): void
     {
         if (!self::isEnabled()) {
             return;
         }
 
-        \rex_view::addCssFile(rex_url::addonAssets('trash', 'trash.css'));
         \rex_view::addJsFile(rex_url::addonAssets('trash', 'trash.js'));
     }
 }

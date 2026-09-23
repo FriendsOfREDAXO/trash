@@ -36,6 +36,30 @@ class TrashService
     private static array $capturedInRequest = [];
 
     /**
+     * Anzahl der Papierkorb-Eintraege, die dieser Benutzer sehen darf.
+     *
+     * Der Papierkorb ist derzeit Admins vorbehalten (perm: admin auf der
+     * Seite und Rechtepruefung in trash.php/QuickUndo). Fuer alle anderen
+     * gibt es nichts zu sehen, also auch nichts zu zaehlen.
+     *
+     * Bekommt das AddOn spaeter eine eingeschraenkte Sicht - etwa "jeder
+     * sieht seine eigenen Loeschungen" ueber deleted_by -, gehoert der
+     * Filter genau hierher: Menuesymbol und Liste bleiben so zwangslaeufig
+     * konsistent.
+     */
+    public static function countVisibleFor(rex_user $user): int
+    {
+        if (!$user->isAdmin()) {
+            return 0;
+        }
+
+        $sql = rex_sql::factory();
+        $sql->setQuery('SELECT COUNT(*) AS count FROM ' . rex::getTable('trash_article'));
+
+        return (int) $sql->getValue('count');
+    }
+
+    /**
      * Login des handelnden Benutzers. Loeschungen koennen auch ohne
      * angemeldeten Benutzer erfolgen (Cronjob, Konsole, API) - dann steht
      * kein Login zur Verfuegung.

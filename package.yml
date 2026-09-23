@@ -25,7 +25,9 @@ page:
     block: system
     title: translate:trash
     perm: admin
-    icon: rex-icon fa fa-trash
+    # Leerer Papierkorb: Umriss. Liegt etwas drin, wechselt boot.php
+    # auf die gefuellte Variante (fa-solid fa-trash).
+    icon: 'rex-icon fa-regular fa-trash-can'
     subpages:
         trash: { title: translate:trash_main }
         settings: { title: translate:trash_settings, icon: 'rex-icon fa-cog' }

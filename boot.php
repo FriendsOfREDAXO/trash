@@ -82,3 +82,37 @@ if (rex::isBackend() && null !== rex::getUser() && QuickUndo::isEnabled()) {
         }, rex_extension::LATE);
     }
 }
+
+// ---------------------------------------------------------------------
+// Menuesymbol: gefuellter Papierkorb, sobald etwas drin liegt
+//
+// Der Papierkorb ist Admins vorbehalten (perm: admin), daher zaehlt hier
+// alles. Sollte das AddOn spaeter eine eingeschraenkte Sicht bekommen -
+// etwa "nur eigene Loeschungen" -, muss der Filter hier mitwandern, sonst
+// verspricht das Symbol Inhalte, die der Benutzer gar nicht sieht.
+// TrashService::countVisibleFor() kapselt genau diese Entscheidung.
+// ---------------------------------------------------------------------
+if (rex::isBackend() && null !== rex::getUser()) {
+    // Das Stylesheet traegt sowohl den Toast als auch die Einfaerbung des
+    // Menuesymbols - es wird deshalb unabhaengig davon geladen, ob das
+    // Sofort-Rueckgaengig eingeschaltet ist.
+    rex_view::addCssFile(rex_url::addonAssets('trash', 'trash.css'));
+
+    rex_extension::register('PAGES_PREPARED', static function (): void {
+        $user = rex::getUser();
+        if (null === $user) {
+            return;
+        }
+
+        $page = rex_be_controller::getPageObject('trash');
+        if (null === $page) {
+            return;
+        }
+
+        // Gefuellt und eingefaerbt, sobald etwas drin liegt - im dunklen
+        // Menue sind Umriss und Fuellung allein kaum zu unterscheiden.
+        if (TrashService::countVisibleFor($user) > 0) {
+            $page->setIcon('rex-icon fa-solid fa-trash trash-icon-filled');
+        }
+    });
+}
