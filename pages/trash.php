@@ -8,7 +8,8 @@
 use FriendsOfREDAXO\trash\TrashService;
 
 // Rechteprüfung
-if (!rex::getUser()->isAdmin()) {
+$user = rex::getUser();
+if (null === $user || !$user->isAdmin()) {
     // Nur Admins dürfen auf den Papierkorb zugreifen
     echo rex_view::error(rex_i18n::msg('no_permission'));
     return;
@@ -31,12 +32,11 @@ $trashSliceMetaTable = $tables['trash_slice_meta'];
 $message = '';
 
 // Debug-Modus zum Anzeigen detaillierter Fehlermeldungen
-$debug = false; // Auf true setzen für Entwicklungszwecke
 
 // Aktionen verarbeiten
 if ($func === 'restore' && $articleId > 0) {
     // Use TrashService to restore article
-    list($success, $resultMessage, $idChanged, $originalRequestedId, $newArticleId, $parentExists, $priorityChangedInfo) = $trashService->restoreArticle($articleId, $debug);
+    list($success, $resultMessage, $idChanged, $originalRequestedId, $newArticleId, $parentExists, $priorityChangedInfo) = $trashService->restoreArticle($articleId);
     
     if ($success) {
         // Check if ID was changed
@@ -63,11 +63,7 @@ if ($func === 'restore' && $articleId > 0) {
             $message .= rex_view::warning('Artikel wiederhergestellt, konnte aber nicht aus Papierkorb entfernt werden: ' . $deleteMessage);
         }
     } else {
-        $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . $resultMessage);
-        
-        if ($debug) {
-            echo '<pre>FEHLER beim Wiederherstellen des Artikels: ' . $resultMessage . '</pre>';
-        }
+        $message = rex_view::error(rex_i18n::msg('trash_restore_error') . ': ' . rex_escape($resultMessage));
     }
 } elseif ($func === 'delete' && $articleId > 0) {
     // Use TrashService to permanently delete article

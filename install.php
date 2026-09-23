@@ -102,3 +102,19 @@ rex_sql_table::get(rex::getTable('trash_slice_meta'))
     ->ensureColumn(new rex_sql_column('meta_data', 'longtext'))
     ->ensureIndex(new rex_sql_index('trash_slice_id', ['trash_slice_id']))
     ->ensure();
+// Kurzlebiger Zwischenspeicher fuer einzeln geloeschte Slices (Sofort-Rueckgaengig).
+// Der Papierkorb kennt Slices nur als Teil eines Artikels; ein einzeln
+// geloeschter Block braucht deshalb eine eigene, nach Ablauf der Frist
+// wieder geleerte Ablage.
+rex_sql_table::get(rex::getTable('trash_slice_undo'))
+    ->ensurePrimaryIdColumn()
+    ->ensureColumn(new rex_sql_column('slice_id', 'int(10) unsigned'))
+    ->ensureColumn(new rex_sql_column('article_id', 'int(10) unsigned'))
+    ->ensureColumn(new rex_sql_column('clang_id', 'int(10) unsigned'))
+    ->ensureColumn(new rex_sql_column('ctype_id', 'int(10) unsigned'))
+    ->ensureColumn(new rex_sql_column('revision', 'int(10) unsigned', false, '0'))
+    ->ensureColumn(new rex_sql_column('payload', 'longtext'))
+    ->ensureColumn(new rex_sql_column('deleted_at', 'datetime'))
+    ->ensureIndex(new rex_sql_index('slice_id', ['slice_id']))
+    ->ensureIndex(new rex_sql_index('deleted_at', ['deleted_at']))
+    ->ensure();

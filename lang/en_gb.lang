@@ -36,3 +36,27 @@ trash_cronjob_max_age_zero = Maximum age is set to 0. No articles were deleted.
 trash_cronjob_deleted_count = {0} old articles were deleted from the trash
 trash_cronjob_no_articles_found = No articles to delete were found
 trash_cronjob_error = Error cleaning up the trash: {0}
+
+# Instant undo (the standalone "undo" addon up to 1.x)
+trash_undo_article_deleted = Article moved to the trash.
+trash_undo_category_deleted = Category moved to the trash.
+trash_undo_slice_deleted = Block deleted.
+trash_undo_action = Undo
+trash_undo_countdown = Possible for another {0} seconds.
+trash_undo_article_restored = Article restored.
+trash_undo_category_restored = Category restored.
+trash_undo_slice_restored = Block restored.
+trash_undo_expired = The time limit has passed. Articles and categories can still be restored from the trash.
+trash_undo_failed = Restoring failed.
+trash_undo_close = Dismiss notice
+trash_undo_csrf = Invalid token, please try again.
+
+# Settings
+trash_settings = Settings
+trash_settings_title = Settings
+trash_settings_saved = Settings saved.
+trash_settings_quick_undo = Offer instant undo
+trash_settings_quick_undo_notice = Shows a notice with an undo link right after deleting. Articles and categories are in the trash anyway; individual blocks are buffered for the duration of the time limit.
+trash_settings_timeout = Time limit in seconds
+trash_settings_timeout_notice = How long the notice stays visible (5–300). Affects only the instant notice, not the trash itself.
+trash_settings_save = Save settings

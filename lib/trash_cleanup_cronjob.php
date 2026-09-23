@@ -16,6 +16,7 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
     public function execute()
     {
         $success = true;
+        /** @var list<string> $message */
         $message = [];
         
         // Maximales Alter in Tagen aus der Konfiguration holen
@@ -38,70 +39,43 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
         $trashSliceTable = rex::getTable('trash_article_slice');
         $trashSliceMetaTable = rex::getTable('trash_slice_meta');
         
-        // SQL Objekt initialisieren
-        $sql = rex_sql::factory();
-        
         try {
-            // Transaktion starten
-            $sql->beginTransaction();
-            
-            // IDs der zu löschenden Artikel holen
+            $sql = rex_sql::factory();
+
+            // IDs der zu löschenden Einträge holen
             $articlesToDelete = $sql->getArray(
                 'SELECT id FROM ' . $trashTable . ' WHERE deleted_at < :delete_date',
                 ['delete_date' => $deleteDateString]
             );
-            
-            // Anzahl der zu löschenden Artikel
+
             $deletedCount = count($articlesToDelete);
-            
+
             if ($deletedCount > 0) {
-                // Alle gefundenen Artikel löschen
-                foreach ($articlesToDelete as $article) {
-                    $id = $article['id'];
-                    
-                    // Zuerst alle Slice-IDs holen, um die Meta-Daten zu löschen
-                    $sliceIds = $sql->getArray(
-                        'SELECT id FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id',
-                        ['id' => $id]
-                    );
-                    
-                    // Für jede Slice-ID die Meta-Daten löschen
-                    foreach ($sliceIds as $slice) {
+                // Alles oder nichts: Meta-Daten, Slices und Einträge gehören zusammen
+                rex_sql::factory()->transactional(static function () use ($articlesToDelete, $trashTable, $trashSliceTable, $trashSliceMetaTable): void {
+                    $sql = rex_sql::factory();
+
+                    foreach ($articlesToDelete as $article) {
+                        $id = (int) $article['id'];
+
                         $sql->setQuery(
-                            'DELETE FROM ' . $trashSliceMetaTable . ' WHERE trash_slice_id = :slice_id',
-                            ['slice_id' => $slice['id']]
+                            'DELETE m FROM ' . $trashSliceMetaTable . ' m
+                             JOIN ' . $trashSliceTable . ' s ON s.id = m.trash_slice_id
+                             WHERE s.trash_article_id = :id',
+                            ['id' => $id]
                         );
+                        $sql->setQuery('DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id', ['id' => $id]);
+                        $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE id = :id', ['id' => $id]);
                     }
-                    
-                    // Dann alle Slices des Artikels löschen
-                    $sql->setQuery(
-                        'DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id',
-                        ['id' => $id]
-                    );
-                    
-                    // Dann den Artikel selbst löschen
-                    $sql->setQuery(
-                        'DELETE FROM ' . $trashTable . ' WHERE id = :id',
-                        ['id' => $id]
-                    );
-                }
-                
+                });
+
                 $message[] = rex_i18n::msg('trash_cronjob_deleted_count', $deletedCount);
             } else {
                 $message[] = rex_i18n::msg('trash_cronjob_no_articles_found');
             }
-            
-            // Transaktion bestätigen
-            $sql->commit();
         } catch (Exception $e) {
-            // Bei Fehler Transaktion zurückrollen
-            if ($sql->inTransaction()) {
-                $sql->rollBack();
-            }
-            
-            // Fehler loggen
             rex_logger::logException($e);
-            
+
             $message[] = rex_i18n::msg('trash_cronjob_error', $e->getMessage());
             $success = false;
         }
@@ -111,9 +85,9 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
     }
     
     /**
-     * Gibt ein Array mit den Beschreibungsfeldern zurück.
+     * Name des Cronjob-Typs.
      *
-     * @return array
+     * @return string
      */
     public function getTypeName()
     {
@@ -123,7 +97,7 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
     /**
      * Gibt die Umgebungen zurück, in denen der Cronjob ausgeführt werden kann.
      *
-     * @return array
+     * @return list<string>
      */
     public function getEnvironments()
     {
@@ -133,7 +107,7 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
     /**
      * Definiert die Parameter des Cronjobs.
      *
-     * @return array
+     * @return list<array<string, mixed>>
      */
     public function getParamFields()
     {

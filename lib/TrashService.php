@@ -23,7 +23,20 @@ use Exception;
 class TrashService
 {
     /**
+     * Login des handelnden Benutzers. Loeschungen koennen auch ohne
+     * angemeldeten Benutzer erfolgen (Cronjob, Konsole, API) - dann steht
+     * kein Login zur Verfuegung.
+     */
+    private function currentUserLogin(): string
+    {
+        $user = rex::getUser();
+
+        return null !== $user ? $user->getLogin() : '';
+    }
+
+    /**
      * Get table names used by trash
+     * @return array<string, string>
      */
     public function getTableNames(): array
     {
@@ -61,11 +74,15 @@ class TrashService
      * 
      * @param string $tableName Name of the table (without prefix)
      * @param rex_sql|rex_article $object Object to read values from
-     * @param array $fieldTypes Optional: Array with field types for slices
-     * @return array Collected meta attributes
+     * @param array<string, int> $fieldTypes Optional: Array with field types for slices
+     * @return array<string, mixed> Collected meta attributes
      */
     public function collectMetaAttributes(string $tableName, $object, array $fieldTypes = []): array
     {
+        if ('' === $tableName) {
+            return [];
+        }
+
         $allMetaAttributes = [];
         $table = rex::getTable($tableName);
 
@@ -192,16 +209,14 @@ class TrashService
      * 
      * @param array $articleData Article data to insert
      * @param bool $debug Debug mode
-     * @return array [success, articleId, errorMessage, idChanged, originalRequestedId]
+     * @param array<string, mixed> $articleData
+     * @return array{0: bool, 1: int|null, 2: string, 3: bool, 4: int}
      */
     public function insertArticleDirectly(array $articleData, bool $debug = false): array
     {
         try {
             // Use table name directly instead of getTable()
             $tableName = rex::getTablePrefix() . 'article';
-            if (empty($tableName)) {
-                return [false, null, "Tabellenname ist leer.", false, 0];
-            }
             
             $idChanged = false;
             $originalId = $articleData['id'];
@@ -276,7 +291,7 @@ class TrashService
     /**
      * Handle article deletion - save to trash
      * 
-     * @param rex_extension_point $ep Extension point
+     * @param rex_extension_point<mixed> $ep Extension point
      */
     public function handleArticleDeletion(rex_extension_point $ep): void
     {
@@ -308,7 +323,7 @@ class TrashService
                 $sql->setValue('catname', $article->getValue('catname'));
                 $sql->setValue('status', $status);
                 $sql->setValue('deleted_at', date('Y-m-d H:i:s'));
-                $sql->setValue('deleted_by', rex::getUser()->getLogin());
+                $sql->setValue('deleted_by', $this->currentUserLogin());
                 
                 // Check if it's a category
                 if ($article->getValue('startarticle') == 1) {
@@ -336,9 +351,9 @@ class TrashService
                 $sql->setValue('template_id', $article->getValue('template_id'));
                 
                 // Format date values correctly here
-                $sql->setValue('createdate', $this->fixDateFormat($article->getValue('createdate')));
+                $sql->setValue('createdate', $this->fixDateFormat((string) $article->getValue('createdate')));
                 $sql->setValue('createuser', $article->getValue('createuser'));
-                $sql->setValue('updatedate', $this->fixDateFormat($article->getValue('updatedate')));
+                $sql->setValue('updatedate', $this->fixDateFormat((string) $article->getValue('updatedate')));
                 $sql->setValue('updateuser', $article->getValue('updateuser'));
                 
                 // Save revision value if available
@@ -447,7 +462,7 @@ class TrashService
      * 
      * @param int $articleId Trash article ID
      * @param bool $debug Debug mode
-     * @return array [success, message, idChanged, originalRequestedId, newArticleId, parentExists, priorityChangedInfo]
+     * @return array{0: bool, 1: string, 2: bool, 3: int, 4: int, 5: bool, 6: string}
      */
     public function restoreArticle(int $articleId, bool $debug = false): array
     {
@@ -465,19 +480,19 @@ class TrashService
             return [false, 'Article not found in trash', false, 0, 0, false, ''];
         }
 
-        $original_id = $sql->getValue('article_id');
-        $parent_id = $sql->getValue('parent_id');
-        $name = $sql->getValue('name');
-        $catname = $sql->getValue('catname');
-        $catpriority = $sql->getValue('catpriority');
-        $status = $sql->getValue('status');
-        $path = $sql->getValue('path');
-        $priority = $sql->getValue('priority');
-        $startarticle = $sql->getValue('startarticle');
-        $template_id = $sql->getValue('template_id');
-        $createdate = $sql->getValue('createdate');
-        $createuser = $sql->getValue('createuser');
-        $metaAttributes = $sql->getValue('meta_attributes') ? json_decode($sql->getValue('meta_attributes'), true) : null;
+        $original_id = (int) $sql->getValue('article_id');
+        $parent_id = (int) $sql->getValue('parent_id');
+        $name = (string) $sql->getValue('name');
+        $catname = (string) $sql->getValue('catname');
+        $catpriority = (int) $sql->getValue('catpriority');
+        $status = (int) $sql->getValue('status');
+        $path = (string) $sql->getValue('path');
+        $priority = (int) $sql->getValue('priority');
+        $startarticle = (int) $sql->getValue('startarticle');
+        $template_id = (int) $sql->getValue('template_id');
+        $createdate = (string) $sql->getValue('createdate');
+        $createuser = (string) $sql->getValue('createuser');
+        $metaAttributes = json_decode((string) $sql->getValue('meta_attributes'), true);
 
         // Check if parent category exists
         $parentExists = true;
@@ -524,9 +539,9 @@ class TrashService
         $articleData['priority'] = $priority;
         $articleData['template_id'] = $template_id;
         $articleData['createdate'] = $createdate;
-        $articleData['createuser'] = !empty($createuser) ? $createuser : rex::getUser()->getLogin();
+        $articleData['createuser'] = '' !== (string) $createuser ? (string) $createuser : $this->currentUserLogin();
         $articleData['updatedate'] = date('Y-m-d H:i:s');
-        $articleData['updateuser'] = rex::getUser()->getLogin();
+        $articleData['updateuser'] = $this->currentUserLogin();
         $articleData['revision'] = 0; // Set to live version
 
         if ($debug) {
@@ -612,7 +627,7 @@ class TrashService
         // List of all languages in which slices exist
         $clangIds = [];
         foreach ($slices as $slice) {
-            $clangIds[$slice['clang_id']] = true;
+            $clangIds[(int) $slice['clang_id']] = true;
         }
 
         // Restore slices for each language
@@ -665,7 +680,7 @@ class TrashService
                         $sliceMetaSql->setQuery('SELECT * FROM ' . $trashSliceMetaTable . ' WHERE trash_slice_id = :slice_id', ['slice_id' => $slice['id']]);
                         
                         if ($sliceMetaSql->getRows() > 0) {
-                            $metaData = json_decode($sliceMetaSql->getValue('meta_data'), true);
+                            $metaData = json_decode((string) $sliceMetaSql->getValue('meta_data'), true);
                             if ($metaData) {
                                 // Get slice table columns for meta attribute restoration
                                 $sliceColumnInfo = rex_sql::showColumns(rex::getTable('article_slice'));
@@ -711,14 +726,14 @@ class TrashService
             }
         }
 
-        return [true, 'success', $idChanged, $originalRequestedId, $newArticleId, $parentExists, $priorityChangedInfo];
+        return [true, 'success', $idChanged, (int) $originalRequestedId, (int) $newArticleId, $parentExists, $priorityChangedInfo];
     }
 
     /**
      * Delete article permanently from trash
      * 
      * @param int $articleId Trash article ID
-     * @return array [success, message]
+     * @return array{0: bool, 1: string}
      */
     public function deleteArticlePermanently(int $articleId): array
     {
@@ -727,36 +742,25 @@ class TrashService
         $trashSliceTable = $tables['trash_slice'];
         $trashSliceMetaTable = $tables['trash_slice_meta'];
 
-        $sql = rex_sql::factory();
-        
         try {
-            // Begin transaction to ensure either everything or nothing is deleted
-            $sql->beginTransaction();
-            
-            // First get all slice IDs to delete meta data
-            $sliceIds = $sql->getArray('SELECT id FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id', ['id' => $articleId]);
-            
-            // Delete meta data for each slice
-            foreach ($sliceIds as $slice) {
-                $sql->setQuery('DELETE FROM ' . $trashSliceMetaTable . ' WHERE trash_slice_id = :slice_id', ['slice_id' => $slice['id']]);
-            }
-            
-            // Then remove slices
-            $sql->setQuery('DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id', ['id' => $articleId]);
-            
-            // Finally delete the article itself
-            $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE id = :id', ['id' => $articleId]);
-            
-            // Complete transaction
-            $sql->commit();
-            
+            // Alles oder nichts: Slices, deren Meta-Daten und der Eintrag selbst
+            rex_sql::factory()->transactional(static function () use ($trashTable, $trashSliceTable, $trashSliceMetaTable, $articleId): void {
+                $sql = rex_sql::factory();
+
+                $sql->setQuery(
+                    'DELETE m FROM ' . $trashSliceMetaTable . ' m
+                     JOIN ' . $trashSliceTable . ' s ON s.id = m.trash_slice_id
+                     WHERE s.trash_article_id = :id',
+                    ['id' => $articleId],
+                );
+                $sql->setQuery('DELETE FROM ' . $trashSliceTable . ' WHERE trash_article_id = :id', ['id' => $articleId]);
+                $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE id = :id', ['id' => $articleId]);
+            });
+
             return [true, 'Article deleted permanently'];
         } catch (Exception $e) {
-            // Rollback transaction on error
-            if ($sql->inTransaction()) {
-                $sql->rollBack();
-            }
             rex_logger::logException($e);
+
             return [false, 'Delete error: ' . $e->getMessage()];
         }
     }
@@ -764,7 +768,7 @@ class TrashService
     /**
      * Empty trash completely
      * 
-     * @return array [success, message]
+     * @return array{0: bool, 1: string}
      */
     public function emptyTrash(): array
     {
@@ -773,30 +777,18 @@ class TrashService
         $trashSliceTable = $tables['trash_slice'];
         $trashSliceMetaTable = $tables['trash_slice_meta'];
 
-        $sql = rex_sql::factory();
-        
         try {
-            // Begin transaction to ensure either everything or nothing is deleted
-            $sql->beginTransaction();
-            
-            // First delete all slice meta data
-            $sql->setQuery('DELETE FROM ' . $trashSliceMetaTable);
-            
-            // Then remove all slices
-            $sql->setQuery('DELETE FROM ' . $trashSliceTable);
-            
-            // Finally all articles
-            $sql->setQuery('DELETE FROM ' . $trashTable);
-            
-            // Complete transaction
-            $sql->commit();
-            
+            rex_sql::factory()->transactional(static function () use ($trashTable, $trashSliceTable, $trashSliceMetaTable): void {
+                $sql = rex_sql::factory();
+                $sql->setQuery('DELETE FROM ' . $trashSliceMetaTable);
+                $sql->setQuery('DELETE FROM ' . $trashSliceTable);
+                $sql->setQuery('DELETE FROM ' . $trashTable);
+            });
+
             return [true, 'Trash emptied'];
         } catch (Exception $e) {
-            // Rollback transaction on error
-            if ($sql->inTransaction()) {
-                $sql->rollBack();
-            }
+            rex_logger::logException($e);
+
             return [false, 'Empty trash error: ' . $e->getMessage()];
         }
     }

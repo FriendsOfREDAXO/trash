@@ -1,0 +1,157 @@
+/**
+ * Trash AddOn - Sofort-Rueckgaengig als Toast
+ *
+ * Der Hinweis erscheint fixiert am unteren Bildschirmrand, damit er nicht
+ * zwischen den uebrigen Meldungen der Seite untergeht. Er verschwindet von
+ * selbst, sobald die Frist abgelaufen ist.
+ */
+
+.trash-undo-toast {
+    position: fixed;
+    z-index: 1100; /* ueber Backend-Navigation und Sticky-Toolbars */
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%) translateY(0);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5em .75em;
+    max-width: min(560px, calc(100vw - 32px));
+    margin: 0;
+    padding: 14px 18px;
+    border: 0;
+    border-left: 4px solid #f0ad4e;
+    border-radius: 6px;
+    background: #2b2b2b;
+    color: #fff;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .35);
+    font-size: 14px;
+    line-height: 1.45;
+    animation: trash-undo-in .28s ease-out both;
+}
+
+/* Beim Ausblenden nach Fristablauf */
+.trash-undo-toast.is-leaving {
+    animation: trash-undo-out .35s ease-in both;
+}
+
+.trash-undo-toast .trash-undo-text {
+    flex: 1 1 auto;
+    min-width: 12em;
+}
+
+.trash-undo-toast .trash-undo-link {
+    flex: 0 0 auto;
+    padding: 6px 14px;
+    border-radius: 4px;
+    background: #f0ad4e;
+    color: #2b2b2b;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.trash-undo-toast .trash-undo-link:hover,
+.trash-undo-toast .trash-undo-link:focus {
+    background: #ec971f;
+    color: #1a1a1a;
+    text-decoration: none;
+}
+
+.trash-undo-toast .trash-undo-link:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.trash-undo-toast .trash-undo-countdown {
+    flex: 0 0 auto;
+    opacity: .8;
+    font-size: .9em;
+}
+
+.trash-undo-toast .trash-undo-seconds {
+    display: inline-block;
+    min-width: 1.5em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+/* Schliessen-Schaltflaeche */
+.trash-undo-toast .trash-undo-close {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    opacity: .65;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.trash-undo-toast .trash-undo-close:hover,
+.trash-undo-toast .trash-undo-close:focus-visible {
+    opacity: 1;
+    background: rgba(255, 255, 255, .12);
+}
+
+/* Der Countdown pulsiert nur in den letzten Sekunden - und nur, wenn die
+   Systemeinstellung Bewegung erlaubt */
+@media (prefers-reduced-motion: no-preference) {
+    .trash-undo-toast.is-expiring .trash-undo-seconds {
+        animation: trash-undo-pulse 1s ease-in-out infinite;
+        color: #ffd479;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .trash-undo-toast,
+    .trash-undo-toast.is-leaving {
+        animation: none;
+    }
+}
+
+@keyframes trash-undo-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes trash-undo-out {
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(16px); }
+}
+
+@keyframes trash-undo-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.18); }
+}
+
+/* Schmale Bildschirme: volle Breite, Aktion unter den Text */
+@media (max-width: 600px) {
+    .trash-undo-toast {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        max-width: none;
+        transform: none;
+        animation-name: trash-undo-in-mobile;
+    }
+
+    .trash-undo-toast.is-leaving {
+        animation-name: trash-undo-out-mobile;
+    }
+
+    @keyframes trash-undo-in-mobile {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes trash-undo-out-mobile {
+        from { opacity: 1; transform: translateY(0); }
+        to   { opacity: 0; transform: translateY(16px); }
+    }
+}

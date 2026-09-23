@@ -14,6 +14,7 @@ Trash fängt deine gelöschten Artikel ab, bevor sie ins digitale Nirvana versch
 
 ## Die coolen Features
 
+- **Sofort-Rückgängig** - Direkt nach dem Löschen ein Hinweis mit Countdown: einmal klicken, Artikel ist zurück. Kein Umweg über den Papierkorb
 - **Automatische Rettung** - Trash schnappt sich jeden gelöschten Artikel blitzschnell
 - **Volle Power** - Alle Inhaltsblöcke, Module und sogar die Arbeitsversion bleiben erhalten
 - **Original-IDs** - Artikel werden wenn möglich unter ihrer ursprünglichen ID wiederhergestellt
@@ -23,10 +24,12 @@ Trash fängt deine gelöschten Artikel ab, bevor sie ins digitale Nirvana versch
 - **Versionierungs-freundlich** - Deine Arbeitsversionen bleiben erhalten (**ja, wirklich!**)
 - **Mehrsprachig** - Deine Übersetzungen sind genauso wichtig wie die Hauptsprache
 - **Aufgeräumt** - Übersichtliche Liste zum einfachen Finden deiner verlorenen Schätze
+- **Einzelne Blöcke** - Auch ein versehentlich gelöschter Slice lässt sich sofort zurückholen
 
 ## Der Alltag mit Trash
 
 Einfach wie Kuchen essen:
+- **"Ups, das war der falsche!"** → Der Hinweis steht noch da: *Rückgängig machen* klicken, fertig
 - **"Oh nein, falscher Artikel gelöscht!"** → Ab in den Papierkorb, wiederherstellen, fertig!
 - **"Der alte Kram kann jetzt wirklich weg"** → Endgültig löschen
 - **"Großreinemachen"** → Papierkorb komplett leeren oder einfach den Cronjob für dich arbeiten lassen
@@ -38,6 +41,32 @@ Einfach wie Kuchen essen:
 - Falls die Original-ID bereits vergeben ist, bekommt der wiederhergestellte Artikel automatisch eine neue ID
 - Meta-Daten werden nur wiederhergestellt, wenn die entsprechenden AddOns noch installiert sind
 - Mit dem Cronjob kannst du festlegen, wie lange Artikel im Papierkorb bleiben sollen (1 Tag bis 1 Jahr)
+
+## Sofort-Rückgängig
+
+Seit Version 2.0.0 zeigt Trash direkt nach dem Löschen einen Hinweis mit Countdown und einem Rückgängig-Link. Das ist der schnelle Weg für den häufigsten Fall: einmal falsch geklickt.
+
+Der Unterschied zum Papierkorb ist nur die Bedienung, nicht der Speicher:
+
+| | Sofort-Rückgängig | Papierkorb |
+|---|---|---|
+| Wann | direkt nach dem Löschen | jederzeit |
+| Wo | Hinweis auf der Seite | *System › Papierkorb* |
+| Artikel & Kategorien | ✅ | ✅ |
+| Einzelne Blöcke (Slices) | ✅ | – (nur als Teil des Artikels) |
+
+Artikel und Kategorien liegen ohnehin im Papierkorb; der Hinweis verlinkt nur die sofortige Rücknahme. Läuft die Frist ab, ist nichts verloren – der Papierkorb bleibt.
+
+Einzelne Blöcke kennt der Papierkorb nicht als eigene Einheit. Sie werden für die Dauer der Frist zwischengespeichert und danach verworfen.
+
+Unter *System › Papierkorb › Einstellungen* lässt sich die Funktion abschalten und die Frist einstellen (5–300 Sekunden, Standard 30).
+
+## Umstieg vom AddOn "undo"
+
+Trash 2.0.0 enthält die Funktion des AddOns [undo](https://github.com/FriendsOfREDAXO/undo). Beide gleichzeitig zu betreiben würde jede Löschung doppelt sichern, deshalb schließen sie sich gegenseitig aus – REDAXO verhindert die Installation mit einer entsprechenden Meldung.
+
+- **Du willst nur das Sofort-Rückgängig?** Dann installiere weiterhin `undo`. Es bleibt eigenständig.
+- **Du willst beides?** Dann nimm `trash`. Beim Update werden vorhandene undo-Einträge automatisch in den Papierkorb übernommen.
 
 ## Technische Details
 
