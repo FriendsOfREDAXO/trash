@@ -150,12 +150,11 @@ class QuickUndo
             return \rex_view::error(rex_i18n::msg('trash_undo_csrf'));
         }
 
-        // Dieselbe Huerde wie auf der Papierkorb-Seite: nur Admins duerfen
-        // Geloeschtes zurueckholen. Ohne diese Pruefung koennte jeder
-        // Backend-Benutzer mit einem gueltigen Token fremde Loeschungen
-        // rueckgaengig machen.
+        // Dieselbe Huerde wie auf der Papierkorb-Seite. Ohne diese Pruefung
+        // koennte jeder Backend-Benutzer mit gueltigem Token fremde
+        // Loeschungen rueckgaengig machen.
         $user = \rex::getUser();
-        if (null === $user || !$user->isAdmin()) {
+        if (!TrashService::mayView($user)) {
             return \rex_view::error(rex_i18n::msg('trash_undo_no_permission'));
         }
 
@@ -197,14 +196,21 @@ class QuickUndo
             return \rex_view::warning(rex_i18n::msg('trash_undo_expired'));
         }
 
+        // Auch hier nur die eigene Sicht: ein fremder Eintrag laesst sich
+        // selbst mit passender ID nicht zurueckholen.
+        $trashId = (int) $sql->getValue('id');
+        if (!TrashService::mayAccessEntry(\rex::getUser(), $trashId)) {
+            return \rex_view::error(rex_i18n::msg('trash_undo_no_permission'));
+        }
+
         $service = new TrashService();
-        [$success, $message] = $service->restoreArticle((int) $sql->getValue('id'));
+        [$success, $message] = $service->restoreArticle($trashId);
 
         if (!$success) {
             return \rex_view::error(rex_i18n::msg('trash_undo_failed') . ' ' . rex_escape($message));
         }
 
-        $service->deleteArticlePermanently((int) $sql->getValue('id'));
+        $service->deleteArticlePermanently($trashId);
 
         return \rex_view::success(rex_i18n::msg(
             'category' === $type ? 'trash_undo_category_restored' : 'trash_undo_article_restored',

@@ -8,6 +8,13 @@
 use FriendsOfREDAXO\trash\QuickUndo;
 use FriendsOfREDAXO\trash\TrashService;
 
+// Rechte: sehen/wiederherstellen und endgueltig loeschen sind getrennt.
+// Admins haben beides ohnehin, ohne dass es gesetzt werden muss.
+if (rex::isBackend()) {
+    rex_perm::register(TrashService::PERM_VIEW, rex_i18n::msg('trash_perm_view'));
+    rex_perm::register(TrashService::PERM_DELETE, rex_i18n::msg('trash_perm_delete'));
+}
+
 // Artikel und Kategorien in den Papierkorb legen, statt sie zu loeschen
 rex_extension::register('ART_PRE_DELETED', static function (rex_extension_point $ep): void {
     (new TrashService())->handleArticleDeletion($ep);

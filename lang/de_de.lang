@@ -1,5 +1,7 @@
 trash = Papierkorb
 trash_main = Übersicht
+trash_perm_view = Papierkorb ansehen und wiederherstellen
+trash_perm_delete = Papierkorb: endgültig löschen und leeren
 trash_intro = Gelöschte Artikel und Kategorien liegen hier, bis sie wiederhergestellt oder endgültig entfernt werden. Beim Wiederherstellen kommen alle Inhalte und Sprachen zurück.
 trash_functions = Funktionen
 trash_type_article = Artikel

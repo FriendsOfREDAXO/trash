@@ -7,13 +7,15 @@
 
 use FriendsOfREDAXO\trash\TrashService;
 
-// Rechteprüfung
+// Rechteprüfung: trash[] zum Ansehen und Wiederherstellen,
+// trash[delete] zusätzlich fürs endgültige Entfernen. Admins haben beides.
 $user = rex::getUser();
-if (null === $user || !$user->isAdmin()) {
-    // Nur Admins dürfen auf den Papierkorb zugreifen
+if (!TrashService::mayView($user)) {
     echo rex_view::error(rex_i18n::msg('no_permission'));
     return;
 }
+
+$mayDelete = TrashService::mayDelete($user);
 
 $trashService = new TrashService();
 
@@ -33,6 +35,18 @@ $message = '';
 // Debug-Modus zum Anzeigen detaillierter Fehlermeldungen
 
 // Aktionen verarbeiten
+// Fremde Einträge sind für Nicht-Admins unsichtbar - und damit auch
+// für jede Aktion gesperrt, selbst bei geratener ID.
+if ('' !== $func && $articleId > 0 && !TrashService::mayAccessEntry($user, $articleId)) {
+    echo rex_view::error(rex_i18n::msg('no_permission'));
+    return;
+}
+
+if (in_array($func, ['delete', 'empty'], true) && !$mayDelete) {
+    echo rex_view::error(rex_i18n::msg('no_permission'));
+    return;
+}
+
 if ($func === 'restore' && $articleId > 0) {
     // Use TrashService to restore article
     list($success, $resultMessage, $idChanged, $originalRequestedId, $newArticleId, $parentExists, $priorityChangedInfo) = $trashService->restoreArticle($articleId);
@@ -75,7 +89,7 @@ if ($func === 'restore' && $articleId > 0) {
     }
 } elseif ($func === 'empty') {
     // Use TrashService to empty trash
-    list($success, $resultMessage) = $trashService->emptyTrash();
+    list($success, $resultMessage) = $trashService->emptyTrash($user);
     
     if ($success) {
         $message = rex_view::success(rex_i18n::msg('trash_emptied'));
@@ -89,14 +103,22 @@ echo $message;
 // Ein Artikel wird immer in allen Sprachen geloescht. Die Spalte "Inhalte in"
 // zeigt deshalb nicht "in welcher Sprache geloescht", sondern in welchen
 // Sprachen ueberhaupt Inhalte gesichert wurden - Kategorien haben keine.
+// Admins sehen alles, alle anderen nur ihre eigenen Löschungen.
+[$visibility, $visibilityParams] = TrashService::visibilityCondition($user, 'a');
+
 $sql = 'SELECT a.*,
         COUNT(s.id) as slice_count,
         GROUP_CONCAT(DISTINCT s.clang_id) as languages
         FROM ' . $trashTable . ' a
         LEFT JOIN ' . $trashSliceTable . ' s
         ON a.id = s.trash_article_id
+        WHERE ' . $visibility . '
         GROUP BY a.id
         ORDER BY a.deleted_at DESC';
+
+foreach ($visibilityParams as $key => $value) {
+    $sql = str_replace(':' . $key, rex_sql::factory()->escape($value), $sql);
+}
 
 $list = rex_list::factory($sql);
 $list->addTableAttribute('class', 'table-hover');
@@ -184,20 +206,22 @@ $list->removeColumn('catname');
 // Aktionen als Text mit Symbol - wie in der Strukturverwaltung
 $list->addColumn('restore', '<i class="rex-icon rex-icon-refresh"></i> ' . rex_i18n::msg('trash_restore'));
 $list->setColumnParams('restore', ['func' => 'restore', 'id' => '###id###']);
-$list->setColumnLayout('restore', ['<th class="rex-table-action" colspan="2">' . rex_i18n::msg('trash_functions') . '</th>', '<td class="rex-table-action">###VALUE###</td>']);
+$list->setColumnLayout('restore', ['<th class="rex-table-action" colspan="' . ($mayDelete ? 2 : 1) . '">' . rex_i18n::msg('trash_functions') . '</th>', '<td class="rex-table-action">###VALUE###</td>']);
 
-$list->addColumn('delete', '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_delete'));
-$list->setColumnParams('delete', ['func' => 'delete', 'id' => '###id###']);
-$list->setColumnLayout('delete', ['', '<td class="rex-table-action">###VALUE###</td>']);
-$list->addLinkAttribute('delete', 'data-confirm', rex_i18n::msg('trash_confirm_delete'));
-$list->addLinkAttribute('delete', 'class', 'rex-link-expanded');
+// Endgültiges Löschen nur mit dem entsprechenden Recht
+if ($mayDelete) {
+    $list->addColumn('delete', '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_delete'));
+    $list->setColumnParams('delete', ['func' => 'delete', 'id' => '###id###']);
+    $list->setColumnLayout('delete', ['', '<td class="rex-table-action">###VALUE###</td>']);
+    $list->addLinkAttribute('delete', 'data-confirm', rex_i18n::msg('trash_confirm_delete'));
+    $list->addLinkAttribute('delete', 'class', 'rex-link-expanded');
+}
 
 $list->setNoRowsMessage(rex_i18n::msg('trash_is_empty'));
 
 // "Papierkorb leeren" nur anbieten, wenn etwas drin ist
-$rows = rex_sql::factory()->getArray('SELECT COUNT(*) AS c FROM ' . $trashTable);
 $options = '';
-if ((int) $rows[0]['c'] > 0) {
+if ($mayDelete && TrashService::countVisibleFor($user) > 0) {
     $options = '<a class="btn btn-delete btn-xs" href="' . rex_url::currentBackendPage(['func' => 'empty']) . '"'
         . ' data-confirm="' . rex_escape(rex_i18n::msg('trash_confirm_empty_trash')) . '">'
         . '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_empty_trash') . '</a>';

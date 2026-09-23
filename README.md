@@ -34,9 +34,19 @@ Einfach wie Kuchen essen:
 - **"Der alte Kram kann jetzt wirklich weg"** → Endgültig löschen
 - **"Großreinemachen"** → Papierkorb komplett leeren oder einfach den Cronjob für dich arbeiten lassen
 
+## Wer darf was?
+
+Seit Version 2.0.0 gibt es zwei Rechte, damit nicht jede Wiederherstellung einen Admin braucht:
+
+| Recht | Erlaubt |
+|---|---|
+| `trash[]` | Papierkorb ansehen und wiederherstellen |
+| `trash[delete]` | zusätzlich endgültig löschen und den Papierkorb leeren |
+
+**Admins haben beides automatisch und sehen den gesamten Papierkorb.** Alle anderen sehen ausschließlich, was sie selbst gelöscht haben – fremde gelöschte Inhalte tauchen weder in der Liste auf noch lassen sie sich über eine geratene ID erreichen. Das gilt auch für das Sofort-Rückgängig und für „Papierkorb leeren“, das dann nur die eigenen Einträge entfernt.
+
 ## Insider-Tipps
 
-- Nur für Admins sichtbar (damit nicht jeder in deinem Müll wühlt)
 - Wenn die Elternkategorie weg ist, landet der wiederhergestellte Artikel einfach in der Hauptebene
 - Falls die Original-ID bereits vergeben ist, bekommt der wiederhergestellte Artikel automatisch eine neue ID
 - Meta-Daten werden nur wiederhergestellt, wenn die entsprechenden AddOns noch installiert sind

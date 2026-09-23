@@ -35,28 +35,92 @@ class TrashService
      */
     private static array $capturedInRequest = [];
 
+    /** Recht, den Papierkorb zu sehen und daraus wiederherzustellen */
+    public const PERM_VIEW = 'trash[]';
+
+    /** Recht, Eintraege endgueltig zu loeschen und den Papierkorb zu leeren */
+    public const PERM_DELETE = 'trash[delete]';
+
+    /** Darf dieser Benutzer den Papierkorb ueberhaupt oeffnen? */
+    public static function mayView(?rex_user $user): bool
+    {
+        return null !== $user && ($user->isAdmin() || $user->hasPerm(self::PERM_VIEW));
+    }
+
+    /** Darf dieser Benutzer Eintraege endgueltig entfernen? */
+    public static function mayDelete(?rex_user $user): bool
+    {
+        return null !== $user && ($user->isAdmin() || $user->hasPerm(self::PERM_DELETE));
+    }
+
+    /**
+     * Sieht dieser Benutzer den gesamten Papierkorb oder nur die eigenen
+     * Loeschungen? Admins sehen alles, alle anderen nur, was sie selbst
+     * geloescht haben - fremde geloeschte Inhalte gehen sie nichts an.
+     */
+    public static function seesEverything(?rex_user $user): bool
+    {
+        return null !== $user && $user->isAdmin();
+    }
+
+    /**
+     * SQL-Bedingung fuer die sichtbaren Eintraege, inklusive Parameter.
+     *
+     * An einer Stelle gebuendelt, damit Liste, Zaehlung und die einzelnen
+     * Aktionen zwangslaeufig dieselbe Sicht verwenden. Sonst zeigte etwa
+     * das Menuesymbol Eintraege an, die auf der Seite gar nicht auftauchen.
+     *
+     * @return array{0: string, 1: array<string, string>}
+     */
+    public static function visibilityCondition(?rex_user $user, string $alias = ''): array
+    {
+        $prefix = '' === $alias ? '' : $alias . '.';
+
+        if (self::seesEverything($user)) {
+            return ['1', []];
+        }
+
+        if (null === $user) {
+            return ['0', []];
+        }
+
+        return [$prefix . 'deleted_by = :trash_user', ['trash_user' => $user->getLogin()]];
+    }
+
     /**
      * Anzahl der Papierkorb-Eintraege, die dieser Benutzer sehen darf.
-     *
-     * Der Papierkorb ist derzeit Admins vorbehalten (perm: admin auf der
-     * Seite und Rechtepruefung in trash.php/QuickUndo). Fuer alle anderen
-     * gibt es nichts zu sehen, also auch nichts zu zaehlen.
-     *
-     * Bekommt das AddOn spaeter eine eingeschraenkte Sicht - etwa "jeder
-     * sieht seine eigenen Loeschungen" ueber deleted_by -, gehoert der
-     * Filter genau hierher: Menuesymbol und Liste bleiben so zwangslaeufig
-     * konsistent.
+     * Grundlage fuer das Menuesymbol - deshalb dieselbe Sicht wie die Liste.
      */
-    public static function countVisibleFor(rex_user $user): int
+    public static function countVisibleFor(?rex_user $user): int
     {
-        if (!$user->isAdmin()) {
+        if (!self::mayView($user)) {
             return 0;
         }
 
+        [$condition, $params] = self::visibilityCondition($user);
+
         $sql = rex_sql::factory();
-        $sql->setQuery('SELECT COUNT(*) AS count FROM ' . rex::getTable('trash_article'));
+        $sql->setQuery('SELECT COUNT(*) AS count FROM ' . rex::getTable('trash_article') . ' WHERE ' . $condition, $params);
 
         return (int) $sql->getValue('count');
+    }
+
+    /** Gehoert dieser Papierkorb-Eintrag zur Sicht des Benutzers? */
+    public static function mayAccessEntry(?rex_user $user, int $trashId): bool
+    {
+        if (!self::mayView($user)) {
+            return false;
+        }
+
+        [$condition, $params] = self::visibilityCondition($user);
+
+        $sql = rex_sql::factory();
+        $sql->setQuery(
+            'SELECT id FROM ' . rex::getTable('trash_article') . ' WHERE id = :id AND ' . $condition,
+            ['id' => $trashId] + $params,
+        );
+
+        return $sql->getRows() > 0;
     }
 
     /**
@@ -814,19 +878,35 @@ class TrashService
      * 
      * @return array{0: bool, 1: string}
      */
-    public function emptyTrash(): array
+    public function emptyTrash(?rex_user $user = null): array
     {
         $tables = $this->getTableNames();
         $trashTable = $tables['trash_article'];
         $trashSliceTable = $tables['trash_slice'];
         $trashSliceMetaTable = $tables['trash_slice_meta'];
 
+        // Nur leeren, was der Benutzer auch sieht: Ein Redakteur ohne
+        // Adminrechte darf nicht den Papierkorb der ganzen Redaktion raeumen.
+        [$visibility, $params] = self::visibilityCondition($user);
+
         try {
-            rex_sql::factory()->transactional(static function () use ($trashTable, $trashSliceTable, $trashSliceMetaTable): void {
+            rex_sql::factory()->transactional(static function () use ($trashTable, $trashSliceTable, $trashSliceMetaTable, $visibility, $params): void {
                 $sql = rex_sql::factory();
-                $sql->setQuery('DELETE FROM ' . $trashSliceMetaTable);
-                $sql->setQuery('DELETE FROM ' . $trashSliceTable);
-                $sql->setQuery('DELETE FROM ' . $trashTable);
+
+                $sql->setQuery(
+                    'DELETE m FROM ' . $trashSliceMetaTable . ' m
+                     JOIN ' . $trashSliceTable . ' s ON s.id = m.trash_slice_id
+                     JOIN ' . $trashTable . ' a ON a.id = s.trash_article_id
+                     WHERE ' . $visibility,
+                    $params,
+                );
+                $sql->setQuery(
+                    'DELETE s FROM ' . $trashSliceTable . ' s
+                     JOIN ' . $trashTable . ' a ON a.id = s.trash_article_id
+                     WHERE ' . $visibility,
+                    $params,
+                );
+                $sql->setQuery('DELETE FROM ' . $trashTable . ' WHERE ' . $visibility, $params);
             });
 
             return [true, 'Trash emptied'];

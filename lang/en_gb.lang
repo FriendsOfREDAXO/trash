@@ -1,5 +1,7 @@
 trash = Trash
 trash_main = Overview
+trash_perm_view = View trash and restore items
+trash_perm_delete = Trash: delete permanently and empty
 trash_intro = Deleted articles and categories stay here until they are restored or removed for good. Restoring brings back all content and languages.
 trash_functions = Functions
 trash_type_article = Article
