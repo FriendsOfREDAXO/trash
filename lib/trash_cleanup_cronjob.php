@@ -74,10 +74,6 @@ class rex_cronjob_trash_cleanup extends rex_cronjob
                 $message[] = rex_i18n::msg('trash_cronjob_no_articles_found');
             }
 
-            // Abgelaufene Sofort-Rueckgaengig-Eintraege einzelner Bloecke.
-            // Sie werden sonst nur beim naechsten Loeschvorgang verworfen und
-            // blieben liegen, wenn laengere Zeit nichts geloescht wird.
-            \FriendsOfREDAXO\trash\QuickUndo::purgeExpired();
         } catch (Exception $e) {
             rex_logger::logException($e);
 

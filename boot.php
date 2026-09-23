@@ -21,16 +21,12 @@ if (rex_addon::get('cronjob')->isAvailable()) {
 // ---------------------------------------------------------------------
 // Sofort-Rueckgaengig (frueher das eigenstaendige AddOn "undo")
 //
-// Artikel und Kategorien liegen bereits im Papierkorb; der Hinweis verlinkt
-// nur die sofortige Ruecknahme. Einzelne Slices kennt der Papierkorb nicht
-// als eigene Einheit, sie werden kurzzeitig zwischengespeichert.
+// Es gibt keinen eigenen Speicher: Artikel und Kategorien liegen im
+// Papierkorb, einzelne Bloecke im Snapshot von structure/history. Der
+// Hinweis verlinkt jeweils nur die sofortige Ruecknahme.
 // ---------------------------------------------------------------------
 if (rex::isBackend() && null !== rex::getUser() && QuickUndo::isEnabled()) {
     QuickUndo::addAssets();
-
-    rex_extension::register('SLICE_DELETE', static function (rex_extension_point $ep): void {
-        QuickUndo::captureSlice($ep);
-    });
 
     rex_extension::register('ART_DELETED', static function (rex_extension_point $ep): string {
         $isCategory = 1 === (int) $ep->getParam('status', 0) && '' !== (string) $ep->getParam('catname', '');
@@ -48,7 +44,13 @@ if (rex::isBackend() && null !== rex::getUser() && QuickUndo::isEnabled()) {
         );
     });
 
+    // Bloecke werden von structure/history gesichert; ohne das Plugin gibt es
+    // fuer sie nichts zurueckzuholen und damit auch keinen Hinweis.
     rex_extension::register('SLICE_DELETED', static function (rex_extension_point $ep): string {
+        if (!QuickUndo::hasHistory()) {
+            return '';
+        }
+
         return QuickUndo::renderNotice('slice', [
             'slice_id' => (int) $ep->getParam('slice_id'),
             'page' => 'content/edit',

@@ -6,9 +6,6 @@ try {
     rex_sql_table::get(rex::getTable('trash_article_slice'))->drop();
     rex_sql_table::get(rex::getTable('trash_slice_meta'))->drop();
 
-    // Zwischenspeicher des Sofort-Rückgängig
-    rex_sql_table::get(rex::getTable('trash_slice_undo'))->drop();
-
     // Cache löschen
     rex_delete_cache();
 

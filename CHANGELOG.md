@@ -16,7 +16,7 @@ Trash bekommt das Sofort-Rückgängig: direkt nach dem Löschen ein Hinweis mit 
 #### Added (Hinzugefügt)
 
 - **Sofort-Rückgängig** für Artikel, Kategorien und einzelne Blöcke. Der Hinweis erscheint direkt nach dem Löschen, zählt die verbleibende Zeit herunter und verschwindet danach von selbst. Artikel und Kategorien liegen dabei im Papierkorb – es gibt **keinen zweiten Speicher**, der Link nimmt die Löschung nur sofort zurück. Läuft die Frist ab, ist nichts verloren.
-- **Einzelne Blöcke (Slices)** werden über den Extension Point `SLICE_DELETE` erfasst. Der Papierkorb kennt Slices nur als Teil eines Artikels; ein einzeln gelöschter Block wird deshalb für die Dauer der Frist zwischengespeichert (`rex_trash_slice_undo`) und danach verworfen.
+- **Einzelne Blöcke (Slices)**: Der Toast holt sie aus dem Snapshot von `structure/history`, das bei `SLICE_DELETE` ohnehin einen anlegt – dort liegen sie je nach Einstellung 7 bis 30 Tage statt weniger Sekunden. Trash speichert dafür **nichts** zusätzlich. Ohne das Plugin erscheint beim Löschen eines Blocks kein Hinweis, weil es dann nichts zurückzuholen gäbe.
 - **Einstellungsseite** unter *System › Papierkorb › Einstellungen*: Sofort-Rückgängig an/aus und Frist in Sekunden (5–300, Standard 30). Ist die Funktion aus, werden auch ihre CSS- und JS-Dateien nicht mehr geladen.
 - **Englische Sprachdatei** vervollständigt; alle neuen Texte in Deutsch und Englisch.
 
@@ -37,7 +37,7 @@ Trash bekommt das Sofort-Rückgängig: direkt nach dem Löschen ein Hinweis mit 
 - **Fatal Error ohne angemeldeten Benutzer behoben**: `rex::getUser()->getLogin()` wurde an drei Stellen ungeprüft aufgerufen. Wird ein Artikel ohne Backend-Session gelöscht (Cronjob, Konsole, API), lieferte `getUser()` `null` und der Aufruf brach ab. Der Login wird jetzt über einen Helfer ermittelt, der in diesem Fall einen leeren String liefert. Dasselbe galt für die Rechteprüfung auf der Papierkorb-Seite.
 - Ein toter `$debug`-Zweig auf der Papierkorb-Seite (fest auf `false`) wurde entfernt; die Fehlermeldung steht ohnehin schon in der regulären Ausgabe und wird jetzt escaped.
 - **Irreführende Countdown-Meldung korrigiert.** „Möglich noch 30 Sekunden" las sich, als sei danach alles verloren. Tatsächlich läuft nur die Sofort-Frist ab – der Papierkorb bleibt. Der Text sagt das jetzt („Noch 30 Sekunden – danach über den Papierkorb"); nur bei einzelnen Blöcken, die wirklich verworfen werden, steht „danach endgültig".
-- **Zwischenspeicher einzelner Blöcke wird zuverlässig aufgeräumt.** Bisher geschah das nur beim nächsten Löschvorgang – wurde längere Zeit nichts gelöscht, blieben Einträge liegen. Jetzt räumen zusätzlich der Cronjob und der Aufruf der Papierkorb-Seite auf.
+- **Kein eigener Zwischenspeicher für Blöcke mehr.** Eine frühere Fassung legte gelöschte Blöcke 30 Sekunden lang in einer eigenen Tabelle ab – eine schlechtere Kopie dessen, was `structure/history` ohnehin tut, mit deutlich kürzerer Frist. Die Tabelle entfällt ersatzlos.
 
 ### 🧹 Code Quality
 

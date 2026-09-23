@@ -5,7 +5,6 @@
  * @package redaxo\trash
  */
 
-use FriendsOfREDAXO\trash\QuickUndo;
 use FriendsOfREDAXO\trash\TrashService;
 
 // Rechteprüfung
@@ -15,10 +14,6 @@ if (null === $user || !$user->isAdmin()) {
     echo rex_view::error(rex_i18n::msg('no_permission'));
     return;
 }
-
-// Abgelaufene Sofort-Rueckgaengig-Eintraege einzelner Bloecke verwerfen.
-// Der Cronjob erledigt das ebenfalls, ist aber optional.
-QuickUndo::purgeExpired();
 
 $trashService = new TrashService();
 

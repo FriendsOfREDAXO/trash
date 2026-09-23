@@ -21,10 +21,14 @@ use Throwable;
  * einen Hinweis mit Countdown und einem Link, der die Loeschung unmittelbar
  * zuruecknimmt - ohne Umweg ueber die Papierkorb-Seite.
  *
- * Artikel und Kategorien liegen dafuer bereits im Papierkorb (TrashService),
- * es gibt also keinen zweiten Speicher. Nur einzelne Slices, die der
- * Papierkorb nicht als eigene Einheit kennt, werden hier zwischengespeichert
- * und nach Ablauf der Frist wieder verworfen.
+ * Es gibt dabei keinen eigenen Speicher:
+ * - Artikel und Kategorien liegen im Papierkorb (TrashService)
+ * - Einzelne Bloecke kommen aus dem Plugin structure/history, das bei
+ *   SLICE_DELETE ohnehin einen Snapshot anlegt - dort liegen sie je nach
+ *   Einstellung Tage statt Sekunden
+ *
+ * Ohne structure/history gibt es fuer einzelne Bloecke keinen Hinweis, weil
+ * die Daten dann nirgends aufbewahrt werden.
  */
 class QuickUndo
 {
@@ -45,63 +49,11 @@ class QuickUndo
         return max(5, min(300, $timeout));
     }
 
-    private static function table(): string
+    /** Ist das Plugin verfuegbar, das Bloecke versioniert? */
+    public static function hasHistory(): bool
     {
-        return rex::getTable('trash_slice_undo');
-    }
-
-    /**
-     * Einzelnen Slice sichern (EP SLICE_DELETE).
-     *
-     * Der Papierkorb sichert Slices nur als Teil eines geloeschten Artikels.
-     * Ein einzeln geloeschter Block hat dort keine Entsprechung, deshalb
-     * dieser kurzlebige Zwischenspeicher.
-     *
-     * @param rex_extension_point<mixed> $ep
-     */
-    public static function captureSlice(rex_extension_point $ep): void
-    {
-        if (!self::isEnabled()) {
-            return;
-        }
-
-        $sliceId = (int) $ep->getParam('slice_id');
-        if ($sliceId < 1) {
-            return;
-        }
-
-        try {
-            self::purgeExpired();
-
-            $slice = rex_sql::factory();
-            $slice->setQuery('SELECT * FROM ' . rex::getTable('article_slice') . ' WHERE id = :id', ['id' => $sliceId]);
-            if (0 === $slice->getRows()) {
-                return;
-            }
-
-            // Spalten einzeln lesen: getRow() liefert bei "SELECT *" je nach
-            // Treiber tabellenqualifizierte Schluessel ("rex_article_slice.id"),
-            // die beim Zurueckschreiben keine gueltigen Spaltennamen waeren.
-            $payload = [];
-            foreach (rex_sql::showColumns(rex::getTable('article_slice')) as $column) {
-                $name = $column['name'];
-                $payload[$name] = $slice->getValue($name);
-            }
-
-            $sql = rex_sql::factory();
-            $sql->setTable(self::table());
-            $sql->setValue('slice_id', $sliceId);
-            $sql->setValue('article_id', (int) $slice->getValue('article_id'));
-            $sql->setValue('clang_id', (int) $slice->getValue('clang_id'));
-            $sql->setValue('ctype_id', (int) $slice->getValue('ctype_id'));
-            $sql->setValue('revision', (int) $slice->getValue('revision'));
-            $sql->setValue('payload', (string) json_encode($payload, JSON_UNESCAPED_UNICODE));
-            $sql->setValue('deleted_at', date('Y-m-d H:i:s'));
-            $sql->insert();
-        } catch (Throwable $e) {
-            // Die Loeschung selbst darf daran nie scheitern
-            \rex_logger::logException($e);
-        }
+        return \rex_plugin::get('structure', 'history')->isAvailable()
+            && class_exists('rex_article_slice_history');
     }
 
     /**
@@ -227,82 +179,80 @@ class QuickUndo
         ));
     }
 
-    /** Einzelnen Slice aus dem Zwischenspeicher zuruecknehmen */
+    /**
+     * Einzelnen Block aus dem Snapshot von structure/history zuruecknehmen.
+     *
+     * Das Plugin legt bei SLICE_DELETE - also vor dem eigentlichen Loeschen -
+     * einen Snapshot aller Bloecke des Artikels an, jeden Block als eigene
+     * Zeile mit seiner slice_id. Daraus laesst sich genau der eine Block
+     * zurueckholen, ohne den ganzen Artikel zurueckzurollen.
+     */
     private static function restoreSlice(int $sliceId): string
     {
         if ($sliceId < 1) {
             return '';
         }
 
+        if (!self::hasHistory()) {
+            return \rex_view::warning(rex_i18n::msg('trash_undo_slice_no_history'));
+        }
+
+        // Existiert der Block noch, wurde bereits zurueckgeholt (Doppelklick)
+        $existing = rex_sql::factory();
+        $existing->setQuery('SELECT id FROM ' . rex::getTable('article_slice') . ' WHERE id = :id', ['id' => $sliceId]);
+        if ($existing->getRows() > 0) {
+            return \rex_view::success(rex_i18n::msg('trash_undo_slice_restored'));
+        }
+
+        $historyTable = \rex_article_slice_history::getTable();
+
         $sql = rex_sql::factory();
         $sql->setQuery(
-            'SELECT * FROM ' . self::table() . '
-             WHERE slice_id = :id AND deleted_at >= :limit
-             ORDER BY id DESC LIMIT 1',
-            ['id' => $sliceId, 'limit' => date('Y-m-d H:i:s', time() - self::getTimeout())],
+            'SELECT * FROM ' . $historyTable . '
+             WHERE slice_id = :id AND history_type = :type
+             ORDER BY history_date DESC, id DESC LIMIT 1',
+            ['id' => $sliceId, 'type' => 'slice_delete'],
         );
+
         if (0 === $sql->getRows()) {
             return \rex_view::warning(rex_i18n::msg('trash_undo_slice_expired'));
         }
 
-        /** @var array<string, scalar|null>|null $payload */
-        $payload = json_decode((string) $sql->getValue('payload'), true);
-        if (!is_array($payload)) {
-            return \rex_view::error(rex_i18n::msg('trash_undo_failed'));
+        // Nur Spalten uebernehmen, die es in article_slice auch gibt: die
+        // History-Tabelle fuehrt zusaetzlich history_* und slice_id.
+        $columns = [];
+        foreach (rex_sql::showColumns(rex::getTable('article_slice')) as $column) {
+            $columns[$column['name']] = true;
         }
+
+        $insert = rex_sql::factory();
+        $insert->setTable(rex::getTable('article_slice'));
+        $insert->setValue('id', $sliceId);
+
+        foreach ($sql->getRow() as $column => $value) {
+            $name = str_contains($column, '.') ? substr($column, strrpos($column, '.') + 1) : $column;
+            if ('id' === $name || !isset($columns[$name])) {
+                continue;
+            }
+            $insert->setValue($name, $value);
+        }
+
+        $insert->insert();
 
         $articleId = (int) $sql->getValue('article_id');
         $clangId = (int) $sql->getValue('clang_id');
         $ctypeId = (int) $sql->getValue('ctype_id');
-        $revision = (int) $sql->getValue('revision');
-
-        $existing = rex_sql::factory();
-        $existing->setQuery('SELECT id FROM ' . rex::getTable('article_slice') . ' WHERE id = :id', ['id' => $sliceId]);
-
-        if (0 === $existing->getRows()) {
-            // Nur tatsaechlich vorhandene Spalten zurueckschreiben. Schuetzt
-            // vor Payloads aelterer Versionen und vor Spalten, die es in der
-            // Zwischenzeit nicht mehr gibt.
-            $columns = [];
-            foreach (rex_sql::showColumns(rex::getTable('article_slice')) as $column) {
-                $columns[$column['name']] = true;
-            }
-
-            $insert = rex_sql::factory();
-            $insert->setTable(rex::getTable('article_slice'));
-            foreach ($payload as $column => $value) {
-                if (isset($columns[$column])) {
-                    $insert->setValue($column, $value);
-                }
-            }
-            $insert->insert();
-        }
-
-        rex_sql::factory()->setQuery('DELETE FROM ' . self::table() . ' WHERE slice_id = :id', ['id' => $sliceId]);
 
         rex_sql_util::organizePriorities(
             rex::getTable('article_slice'),
             'priority',
-            'article_id = ' . $articleId . ' AND clang_id = ' . $clangId . ' AND ctype_id = ' . $ctypeId . ' AND revision = ' . $revision,
+            'article_id = ' . $articleId . ' AND clang_id = ' . $clangId . ' AND ctype_id = ' . $ctypeId . ' AND revision = 0',
             'priority, updatedate DESC',
         );
 
         rex_article_cache::delete($articleId, $clangId);
 
         return \rex_view::success(rex_i18n::msg('trash_undo_slice_restored'));
-    }
-
-    /**
-     * Abgelaufene Slice-Zwischenspeicher verwerfen.
-     * Artikel und Kategorien bleiben im Papierkorb - dort ist die Frist
-     * ausdruecklich unbegrenzt.
-     */
-    public static function purgeExpired(): void
-    {
-        rex_sql::factory()->setQuery(
-            'DELETE FROM ' . self::table() . ' WHERE deleted_at < :limit',
-            ['limit' => date('Y-m-d H:i:s', time() - self::getTimeout())],
-        );
     }
 
     /** Assets nur laden, wenn die Funktion aktiv ist */

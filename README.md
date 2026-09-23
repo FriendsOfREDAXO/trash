@@ -48,18 +48,18 @@ Seit Version 2.0.0 zeigt Trash direkt nach dem Löschen einen Hinweis mit Countd
 
 Der Unterschied zum Papierkorb ist nur die Bedienung, nicht der Speicher:
 
-| | Sofort-Rückgängig | Papierkorb |
-|---|---|---|
-| Wann | direkt nach dem Löschen | jederzeit |
-| Wo | Hinweis auf der Seite | *System › Papierkorb* |
-| Artikel & Kategorien | ✅ | ✅ |
-| Einzelne Blöcke (Slices) | ✅ | – (nur als Teil des Artikels) |
+**Trash legt dafür nichts zusätzlich ab.** Der Toast ist nur eine Abkürzung zu Daten, die ohnehin gesichert sind:
 
-Artikel und Kategorien liegen ohnehin im Papierkorb; der Hinweis verlinkt nur die sofortige Rücknahme. **Läuft die Frist ab, ist nichts verloren** – der Artikel bleibt im Papierkorb und lässt sich dort jederzeit wiederherstellen.
+| | woher die Daten kommen | wie lange |
+|---|---|---|
+| Artikel & Kategorien | Papierkorb (dieses AddOn) | unbegrenzt |
+| Einzelne Blöcke | Verlauf (`structure/history`) | 7–30 Tage, je nach Einstellung |
+
+**Läuft die 30-Sekunden-Frist ab, ist nichts verloren.** Artikel und Kategorien bleiben im Papierkorb, Blöcke im Verlauf des Artikels (*Editiermodus › Verlauf*). Der Toast sagt das auch: „danach über den Papierkorb" bzw. „danach über den Verlauf".
+
+Ist das Plugin `structure/history` nicht installiert, erscheint beim Löschen eines Blocks **kein** Hinweis – dann gibt es nichts zurückzuholen, und ein Rückgängig-Link wäre ein leeres Versprechen.
 
 Das Zurücknehmen ist wie der Papierkorb selbst Admins vorbehalten, und die Frist wird serverseitig geprüft – ein alter Link holt nichts zurück.
-
-Einzelne Blöcke kennt der Papierkorb nicht als eigene Einheit. Sie werden für die Dauer der Frist zwischengespeichert und danach verworfen.
 
 Unter *System › Papierkorb › Einstellungen* lässt sich die Funktion abschalten und die Frist einstellen (5–300 Sekunden, Standard 30).
 

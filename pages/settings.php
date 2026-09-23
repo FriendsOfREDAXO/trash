@@ -28,6 +28,11 @@ $content = '<div class="checkbox"><label><input type="checkbox" name="quick_undo
     . rex_i18n::msg('trash_settings_quick_undo') . '</label></div>'
     . '<p class="help-block">' . rex_i18n::msg('trash_settings_quick_undo_notice') . '</p>';
 
+// Hinweis zum Verlauf-Plugin: ohne dieses sind Bloecke nicht abgesichert
+$content .= QuickUndo::hasHistory()
+    ? '<p class="text-muted"><i class="rex-icon fa-check"></i> ' . rex_i18n::msg('trash_settings_history_ok') . '</p>'
+    : rex_view::info(rex_i18n::msg('trash_settings_history_missing'));
+
 $content .= '<div class="form-group">'
     . '<label class="control-label" for="trash-timeout">' . rex_i18n::msg('trash_settings_timeout') . '</label>'
     . '<input class="form-control" type="number" id="trash-timeout" name="quick_undo_timeout" min="5" max="300" value="' . $timeout . '">'
