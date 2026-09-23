@@ -203,8 +203,11 @@ if ((int) $rows[0]['c'] > 0) {
         . '<i class="rex-icon rex-icon-delete"></i> ' . rex_i18n::msg('trash_empty_trash') . '</a>';
 }
 
+// "body" bekommt den Innenabstand des Panels, "content" wird roh ausgegeben -
+// der Erklaertext gehoert deshalb in body, die Tabelle randlos in content.
 $fragment = new rex_fragment();
 $fragment->setVar('title', rex_i18n::msg('trash'), false);
-$fragment->setVar('content', '<p>' . rex_i18n::msg('trash_intro') . '</p>' . $list->get(), false);
+$fragment->setVar('body', '<p class="rex-panel-intro">' . rex_i18n::msg('trash_intro') . '</p>', false);
+$fragment->setVar('content', $list->get(), false);
 $fragment->setVar('options', $options, false);
 echo $fragment->parse('core/page/section.php');

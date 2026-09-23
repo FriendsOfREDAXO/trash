@@ -23,6 +23,19 @@ use Exception;
 class TrashService
 {
     /**
+     * Bereits in diesem Request gesicherte Artikel-IDs.
+     *
+     * ART_PRE_DELETED feuert je Sprache, der Papierkorb-Eintrag soll aber
+     * nur einmal entstehen. Die Merkliste gilt bewusst nur fuer den
+     * laufenden Request: Ein spaeterer Loeschvorgang mit derselben ID - die
+     * REDAXO ueber MAX(id) + 1 durchaus erneut vergibt - muss wieder
+     * gesichert werden.
+     *
+     * @var array<int, true>
+     */
+    private static array $capturedInRequest = [];
+
+    /**
      * Login des handelnden Benutzers. Loeschungen koennen auch ohne
      * angemeldeten Benutzer erfolgen (Cronjob, Konsole, API) - dann steht
      * kein Login zur Verfuegung.
@@ -309,19 +322,15 @@ class TrashService
         $trashTable = $tables['trash_article'];
         $trashSliceTable = $tables['trash_slice'];
         
-        // ART_PRE_DELETED feuert je Sprache - der Eintrag soll aber nur einmal
-        // entstehen. Die Pruefung darf sich dabei nicht allein auf article_id
-        // stuetzen: REDAXO vergibt geloeschte IDs neu, sonst waere ein spaeter
-        // geloeschter Artikel mit derselben ID faelschlich ein "Duplikat" und
-        // wuerde gar nicht gesichert. Deshalb zusaetzlich auf den laufenden
-        // Loeschvorgang begrenzen.
-        $sql = rex_sql::factory();
-        $exists = $sql->getArray(
-            'SELECT id FROM ' . $trashTable . ' WHERE article_id = :article_id AND deleted_at >= :since',
-            ['article_id' => $articleId, 'since' => date('Y-m-d H:i:s', time() - 5)],
-        );
-        
-        if (empty($exists)) {
+        // Nur einmal je Loeschvorgang sichern (der Extension Point feuert je
+        // Sprache). Frueher wurde dafuer geprueft, ob die article_id schon im
+        // Papierkorb liegt - das war falsch: rex_sql::setNewId() vergibt neue
+        // IDs als MAX(id) + 1, sodass nach dem Loeschen des hoechsten Artikels
+        // derselbe Wert erneut vergeben wird. Ein alter Eintrag liess die
+        // naechste Loeschung dann stillschweigend ausfallen. Kategorien sind
+        // genauso betroffen, sie teilen sich mit Artikeln Tabelle und ID-Raum.
+        if (!isset(self::$capturedInRequest[$articleId])) {
+            self::$capturedInRequest[$articleId] = true;
             // Save article reference for all available languages (only once)
             $article = rex_article::get($articleId, $clangId);
             if ($article) {

@@ -194,3 +194,17 @@
         to   { opacity: 0; transform: translateY(16px); }
     }
 }
+
+/**
+ * Erklaertext im Panel-Kopfbereich: etwas zurueckgenommen und mit klarer
+ * Trennlinie zur Tabelle, damit er nicht an ihr klebt.
+ */
+.rex-page-section .panel-body > .rex-panel-intro {
+    margin: 0;
+    color: #6a737d;
+}
+
+.rex-page-section .panel-body:has(> .rex-panel-intro:only-child) {
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+}
