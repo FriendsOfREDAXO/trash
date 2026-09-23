@@ -139,8 +139,13 @@ class QuickUndo
             . '<span class="trash-undo-text">' . rex_escape($label) . '</span>'
             . '<a class="trash-undo-link" data-pjax="false" href="' . rex_escape($url) . '">'
             . rex_escape(rex_i18n::msg('trash_undo_action')) . '</a>'
+            // Bei Artikeln und Kategorien laeuft nur die Sofort-Frist ab, der
+            // Papierkorb bleibt. Nur einzelne Slices sind danach wirklich weg.
             . '<span class="trash-undo-countdown" data-timeout="' . $timeout . '">'
-            . rex_i18n::rawMsg('trash_undo_countdown', '<span class="trash-undo-seconds">' . $timeout . '</span>')
+            . rex_i18n::rawMsg(
+                'slice' === $type ? 'trash_undo_countdown_slice' : 'trash_undo_countdown',
+                '<span class="trash-undo-seconds">' . $timeout . '</span>',
+            )
             . '</span>'
             . '<button type="button" class="trash-undo-close" aria-label="' . rex_escape(rex_i18n::msg('trash_undo_close')) . '">&times;</button>'
             . '</div>';
@@ -159,6 +164,15 @@ class QuickUndo
 
         if (!rex_csrf_token::factory(self::CSRF_ID)->isValid()) {
             return \rex_view::error(rex_i18n::msg('trash_undo_csrf'));
+        }
+
+        // Dieselbe Huerde wie auf der Papierkorb-Seite: nur Admins duerfen
+        // Geloeschtes zurueckholen. Ohne diese Pruefung koennte jeder
+        // Backend-Benutzer mit einem gueltigen Token fremde Loeschungen
+        // rueckgaengig machen.
+        $user = \rex::getUser();
+        if (null === $user || !$user->isAdmin()) {
+            return \rex_view::error(rex_i18n::msg('trash_undo_no_permission'));
         }
 
         try {
@@ -184,10 +198,15 @@ class QuickUndo
             return '';
         }
 
+        // Nur der Eintrag der gerade erfolgten Loeschung, nicht irgendein
+        // aelterer mit derselben Artikel-ID: Der Link ist die Sofort-Aktion,
+        // fuer alles andere ist die Papierkorb-Seite zustaendig.
         $sql = rex_sql::factory();
         $sql->setQuery(
-            'SELECT id FROM ' . rex::getTable('trash_article') . ' WHERE article_id = :id ORDER BY id DESC LIMIT 1',
-            ['id' => $articleId],
+            'SELECT id FROM ' . rex::getTable('trash_article') . '
+             WHERE article_id = :id AND deleted_at >= :limit
+             ORDER BY id DESC LIMIT 1',
+            ['id' => $articleId, 'limit' => date('Y-m-d H:i:s', time() - self::getTimeout())],
         );
 
         if (0 === $sql->getRows()) {
@@ -216,9 +235,14 @@ class QuickUndo
         }
 
         $sql = rex_sql::factory();
-        $sql->setQuery('SELECT * FROM ' . self::table() . ' WHERE slice_id = :id ORDER BY id DESC LIMIT 1', ['id' => $sliceId]);
+        $sql->setQuery(
+            'SELECT * FROM ' . self::table() . '
+             WHERE slice_id = :id AND deleted_at >= :limit
+             ORDER BY id DESC LIMIT 1',
+            ['id' => $sliceId, 'limit' => date('Y-m-d H:i:s', time() - self::getTimeout())],
+        );
         if (0 === $sql->getRows()) {
-            return \rex_view::warning(rex_i18n::msg('trash_undo_expired'));
+            return \rex_view::warning(rex_i18n::msg('trash_undo_slice_expired'));
         }
 
         /** @var array<string, scalar|null>|null $payload */

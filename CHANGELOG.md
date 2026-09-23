@@ -27,10 +27,17 @@ Trash bekommt das Sofort-Rückgängig: direkt nach dem Löschen ein Hinweis mit 
 - `update.php` pflegt die Tabellenstruktur nicht mehr als zweite Kopie, sondern bindet `install.php` ein (alle Definitionen sind idempotent). Das beseitigt die bisherige Doppelpflege.
 - Mindestanforderung auf **REDAXO ^5.18** angehoben.
 
+### 🔒 Security
+
+- **Rechteprüfung beim Sofort-Rückgängig ergänzt.** Die Papierkorb-Seite ist Admins vorbehalten, der Rückgängig-Link prüfte bislang nur das CSRF-Token. Ein Backend-Benutzer ohne Admin-Rechte hätte damit fremde Löschungen zurücknehmen können. Es gilt jetzt dieselbe Hürde wie auf der Papierkorb-Seite.
+- **Frist wird serverseitig durchgesetzt.** Der Countdown war reine Anzeige; der Link funktionierte unbegrenzt weiter. Bei Artikeln konnte er dadurch sogar einen später gelöschten Eintrag mit derselben ID zurückholen. Beide Wiederherstellungswege prüfen jetzt `deleted_at` gegen die eingestellte Frist.
+
 ### 🐛 Bug Fixes (Fehlerbehebungen)
 
 - **Fatal Error ohne angemeldeten Benutzer behoben**: `rex::getUser()->getLogin()` wurde an drei Stellen ungeprüft aufgerufen. Wird ein Artikel ohne Backend-Session gelöscht (Cronjob, Konsole, API), lieferte `getUser()` `null` und der Aufruf brach ab. Der Login wird jetzt über einen Helfer ermittelt, der in diesem Fall einen leeren String liefert. Dasselbe galt für die Rechteprüfung auf der Papierkorb-Seite.
 - Ein toter `$debug`-Zweig auf der Papierkorb-Seite (fest auf `false`) wurde entfernt; die Fehlermeldung steht ohnehin schon in der regulären Ausgabe und wird jetzt escaped.
+- **Irreführende Countdown-Meldung korrigiert.** „Möglich noch 30 Sekunden" las sich, als sei danach alles verloren. Tatsächlich läuft nur die Sofort-Frist ab – der Papierkorb bleibt. Der Text sagt das jetzt („Noch 30 Sekunden – danach über den Papierkorb"); nur bei einzelnen Blöcken, die wirklich verworfen werden, steht „danach endgültig".
+- **Zwischenspeicher einzelner Blöcke wird zuverlässig aufgeräumt.** Bisher geschah das nur beim nächsten Löschvorgang – wurde längere Zeit nichts gelöscht, blieben Einträge liegen. Jetzt räumen zusätzlich der Cronjob und der Aufruf der Papierkorb-Seite auf.
 
 ### 🧹 Code Quality
 

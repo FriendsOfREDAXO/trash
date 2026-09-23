@@ -55,7 +55,9 @@ Der Unterschied zum Papierkorb ist nur die Bedienung, nicht der Speicher:
 | Artikel & Kategorien | ✅ | ✅ |
 | Einzelne Blöcke (Slices) | ✅ | – (nur als Teil des Artikels) |
 
-Artikel und Kategorien liegen ohnehin im Papierkorb; der Hinweis verlinkt nur die sofortige Rücknahme. Läuft die Frist ab, ist nichts verloren – der Papierkorb bleibt.
+Artikel und Kategorien liegen ohnehin im Papierkorb; der Hinweis verlinkt nur die sofortige Rücknahme. **Läuft die Frist ab, ist nichts verloren** – der Artikel bleibt im Papierkorb und lässt sich dort jederzeit wiederherstellen.
+
+Das Zurücknehmen ist wie der Papierkorb selbst Admins vorbehalten, und die Frist wird serverseitig geprüft – ein alter Link holt nichts zurück.
 
 Einzelne Blöcke kennt der Papierkorb nicht als eigene Einheit. Sie werden für die Dauer der Frist zwischengespeichert und danach verworfen.
 

@@ -5,6 +5,7 @@
  * @package redaxo\trash
  */
 
+use FriendsOfREDAXO\trash\QuickUndo;
 use FriendsOfREDAXO\trash\TrashService;
 
 // Rechteprüfung
@@ -15,7 +16,10 @@ if (null === $user || !$user->isAdmin()) {
     return;
 }
 
-// TrashService initialisieren
+// Abgelaufene Sofort-Rueckgaengig-Eintraege einzelner Bloecke verwerfen.
+// Der Cronjob erledigt das ebenfalls, ist aber optional.
+QuickUndo::purgeExpired();
+
 $trashService = new TrashService();
 
 // Durchführung von Aktionen (Wiederherstellen oder Endgültig löschen)
