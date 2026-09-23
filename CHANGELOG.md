@@ -7,7 +7,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-09-23
+## [2.0.0] - 2026-09-24
 
 Trash bekommt das Sofort-Rückgängig: direkt nach dem Löschen ein Hinweis mit Countdown und einem Klick zurück – ohne Umweg über die Papierkorb-Seite. Damit deckt ein AddOn beide Fälle ab, den schnellen Griff daneben und das späte „wo ist eigentlich …".
 
